@@ -16,15 +16,20 @@ public class ProductManager {
         int choice = 0;
         do {
             try {
-                MainDB.clearScreen();
-                System.out.println("==================== MANAGE PRODUCTS ====================");
-                System.out.println("1. Add Product");
-                System.out.println("2. View Products");
-                System.out.println("3. Edit Product");
-                System.out.println("4. Delete Product");
-                System.out.println("5. View Inventory Log");
-                System.out.println("6. Logout");
-                System.out.print("Enter choice: ");
+            	MainDB.clearScreen();
+            	System.out.println("╔══════════════════════════════════════════════════════════╗");
+            	System.out.println("║               🧾  MANAGE PRODUCTS MENU\u200B                   ║");
+            	System.out.println("╚══════════════════════════════════════════════════════════╝");
+
+
+            	System.out.println("[1]   Add New Product");
+            	System.out.println("[2]   View All Products");
+            	System.out.println("[3]   Edit Product Details");
+            	System.out.println("[4]   Delete Product");
+            	System.out.println("[5]   View Inventory Log");
+            	System.out.println("[6]   Logout");
+            	System.out.println("────────────────────────────────────────────────────────────");
+            	System.out.print("Enter your choice ➤ ");
 
                 try {
                     choice = Integer.parseInt(sc.nextLine().trim());
@@ -57,7 +62,7 @@ public class ProductManager {
     // PUBLIC VIEW PRODUCTS (Users)
     // ==========================================================
     public static void viewAllProducts(Connection conn, Scanner sc, int userId, boolean loggedIn) {
-        Map<Integer, Integer> cart = new HashMap<>(); // product_id -> quantity
+        Map<Integer, Integer> cart = new HashMap<>(); 
         int choice;
 
         do {
@@ -105,16 +110,21 @@ public class ProductManager {
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
 
-            System.out.printf("%-5s %-30s %-10s %-10s%n", "ID", "Name", "Price", "Stock");
-            System.out.println("===============================================================");
+            System.out.println("╔═══════════════════════════════════════════════════════════╗");
+            System.out.println("║                          🧾  PRODUCT LIST                 ║");
+            System.out.println("╚═══════════════════════════════════════════════════════════╝");
+            System.out.printf("%-4s│ %-30s│ %-9s│ %-5s%n", "ID", "Product Name", "Price", "Stock");
+            System.out.println("────┼───────────────────────────────┼──────────┼────────");
+            
             while (rs.next()) {
-                System.out.printf("%-5d %-30s %-10.2f %-10d%n",
+                System.out.printf("%-4d│ %-30s│ ₱%7.2f │ %5d%n",
                         rs.getInt("id"),
                         rs.getString("name"),
                         rs.getDouble("price"),
                         rs.getInt("stock"));
             }
-            System.out.println("---------------------------------------------------------------");
+
+            System.out.println("──────────────────────────────────────────────────────────────");
         }
     }
 
@@ -246,11 +256,12 @@ public class ProductManager {
     // ==========================================================
     public static void addProduct(Connection conn, Scanner sc) {
         try {
-            MainDB.clearScreen();
-            System.out.println("=================================================================");
-            System.out.println( "                            ADD PRODUCT"                                                     );
-            System.out.println("=================================================================");
-            System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
+        	MainDB.clearScreen();
+        	System.out.println("╔══════════════════════════════════════════════════════════╗");
+        	System.out.println("║                       ➕  ADD PRODUCT                    ║");
+        	System.out.println("╚══════════════════════════════════════════════════════════╝");
+        	System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
+
 
             String name;
             do {
@@ -318,9 +329,11 @@ public class ProductManager {
     // ==========================================================
     public static void editProduct(Connection conn, Scanner sc) {
         try {
-            MainDB.clearScreen();
-            System.out.println(     "==================== EDIT PRODUCT ======================"                         );
-            viewProductsQuick(conn);
+        	MainDB.clearScreen();
+        	System.out.println("╔══════════════════════════════════════════════════════════╗");
+        	System.out.println("║                      ✏️  EDIT PRODUCT MENU               ║");
+        	System.out.println("╚══════════════════════════════════════════════════════════╝");
+        	viewProductsQuick(conn);
 
             System.out.println(YELLOW + "\nType 'back' to return.\n" + RESET);
             System.out.print("Enter Product ID to edit: ");
@@ -407,9 +420,11 @@ public class ProductManager {
     // ==========================================================
     public static void deleteProduct(Connection conn, Scanner sc) {
         try {
-            MainDB.clearScreen();
-            System.out.println(     "==================== DELETE PRODUCT ===================="                         );
-            viewProductsQuick(conn);
+        	MainDB.clearScreen();
+        	System.out.println("╔══════════════════════════════════════════════════════════╗");
+        	System.out.println("║                     🗑️  DELETE PRODUCT MENU              ║");
+        	System.out.println("╚══════════════════════════════════════════════════════════╝");
+        	viewProductsQuick(conn);
 
             System.out.println(YELLOW + "\nType 'back' to return." + RESET);
             System.out.print("Enter Product ID to delete: ");
@@ -491,28 +506,41 @@ public class ProductManager {
     public static void viewProducts(Connection conn) {
         try {
             MainDB.clearScreen();
-            System.out.println(     "==================== PRODUCT LIST ===================="                         );
+            System.out.println("╔═══════════════════════════════════════════════════════════╗");
+            System.out.println("║                          🧾  PRODUCT LIST                  ║");
+            System.out.println("╚═══════════════════════════════════════════════════════════╝");
+
             String sql = "SELECT * FROM products ORDER BY id";
             try (Statement st = conn.createStatement();
                  ResultSet rs = st.executeQuery(sql)) {
 
-                System.out.println("ID\tName\t\tPrice\tStock");
-                System.out.println(     "======================================================"                         );
+                System.out.println("ID   │ Product Name                   │   Price   │ Stock");
+                System.out.println("─────┼────────────────────────────────┼───────────┼──────");
+
+                int totalProducts = 0;
                 while (rs.next()) {
-                    System.out.printf("%d\t%-15s\t%.2f\t%d%n",
-                            rs.getInt("id"),
-                            rs.getString("name"),
-                            rs.getDouble("price"),
-                            rs.getInt("stock"));
+                    int id = rs.getInt("id");
+                    String name = rs.getString("name");
+                    double price = rs.getDouble("price");
+                    int stock = rs.getInt("stock");
+
+                    System.out.printf("%-4d │ %-30s │ ₱ %7.2f │ %4d%n", id, name, price, stock);
+                    totalProducts++;
                 }
-                System.out.println("------------------------------------------------------");
+
+                System.out.println("────────────────────────────────────────────────────────────");
+                System.out.printf("📦 Total Products: %d%n", totalProducts);
             }
+
+            System.out.print("Press ENTER to return...");
             MainDB.pause();
+
         } catch (SQLException e) {
             System.out.println(RED + "Error loading products: " + e.getMessage() + RESET);
             MainDB.pause();
         }
     }
+
 
     private static void viewProductsQuick(Connection conn) {
         try {
@@ -520,21 +548,25 @@ public class ProductManager {
             try (Statement st = conn.createStatement();
                  ResultSet rs = st.executeQuery(sql)) {
 
-                System.out.println("\nID\tName\t\tPrice\tStock");
-                System.out.println("--------------------------------------------------------");
+                System.out.println();
+                System.out.println("ID │ Product Name                   │   Price    │ Stock");
+                System.out.println("───┼────────────────────────────────┼────────────┼──────");
+
                 while (rs.next()) {
-                    System.out.printf("%d\t%-15s\t%.2f\t%d%n",
+                    System.out.printf("%-3d│ %-30s │ ₱ %-8.2f │ %-5d%n",
                             rs.getInt("id"),
                             rs.getString("name"),
                             rs.getDouble("price"),
                             rs.getInt("stock"));
                 }
-                System.out.println("--------------------------------------------------------");
+
+                System.out.println("────────────────────────────────────────────────────────────");
             }
         } catch (SQLException e) {
             System.out.println(RED + "Error loading product list: " + e.getMessage() + RESET);
         }
     }
+
     
     public static void viewCart(Connection conn, Scanner sc, String username) {
         try {
