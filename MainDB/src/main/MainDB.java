@@ -22,15 +22,18 @@ public class MainDB {
 
             boolean running = true;
             while (running) {
-                clearScreen();
-                System.out.println("==================================================");
-                System.out.println("          UNIFORM SALES & MANAGEMENT SYSTEM      ");
-                System.out.println("==================================================");
-                System.out.println("1. View All Available Products");
-                System.out.println("2. Login");
-                System.out.println("3. Register");
-                System.out.println("4. Exit");
-                System.out.print("Enter choice: ");
+            	clearScreen();
+            	System.out.println("╔══════════════════════════════════════════════════════════════════╗");
+            	System.out.println("║            👔  UNIFORM SALES & MANAGEMENT SYSTEM                 ║");
+            	System.out.println("╚══════════════════════════════════════════════════════════════════╝");
+                System.out.println("                  Developed by: Team UniformX");
+                System.out.println("────────────────────────────────────────────────────────────────────");
+                System.out.println("[1]   View All Available Products");
+                System.out.println("[2]   Login to Your Account");
+                System.out.println("[3]   Register New Account");
+                System.out.println("[4]   Exit Application");
+                System.out.println("────────────────────────────────────────────────────────────────────");
+                System.out.print("Enter your choice ➤ ");
 
                 int choice = readInt();
                 switch (choice) {
