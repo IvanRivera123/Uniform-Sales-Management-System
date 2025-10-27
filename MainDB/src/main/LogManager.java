@@ -14,9 +14,6 @@ public class LogManager {
     public static void viewInventoryLog(Connection conn) {
         try {
             MainDB.clearScreen();
-            System.out.println("==================================================================================================");
-            System.out.println("                                      INVENTORY LOG HISTORY");
-            System.out.println("==================================================================================================");
 
             String sql = """
                 SELECT l.id, 
@@ -35,7 +32,7 @@ public class LogManager {
                  ResultSet rs = st.executeQuery(sql)) {
 
                 List<String[]> records = new ArrayList<>();
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMMM dd, yyyy hh:mm a");
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMMM dd, yyyy  hh:mm a");
 
                 while (rs.next()) {
                     int id = rs.getInt("id");
@@ -57,34 +54,31 @@ public class LogManager {
                         default -> color = RESET;
                     }
 
-                    // Format type and quantity with color
-                    String paddedType = String.format("%-12s", type);
-                    String coloredType = color + paddedType + RESET;
+                    // Color-coded type & quantity
+                    String coloredType = color + String.format("%-6s", type) + RESET;
 
-                    String paddedQty;
-                    if (type.equalsIgnoreCase("ADD") || type.equalsIgnoreCase("RESTOCK") || (type.equalsIgnoreCase("EDIT") && qty > 0)) {
-                        paddedQty = String.format("%-8s", "+" + qty);
-                    } else if (type.equalsIgnoreCase("SALE") || type.equalsIgnoreCase("DELETE") || (type.equalsIgnoreCase("EDIT") && qty < 0)) {
-                        paddedQty = String.format("%-8s", "" + qty);
-                    } else {
-                        paddedQty = String.format("%-8s", qty);
-                    }
-                    String coloredQty = color + paddedQty + RESET;
+                    String qtyDisplay = (type.equalsIgnoreCase("ADD") || type.equalsIgnoreCase("RESTOCK") || qty > 0)
+                            ? "+" + qty : String.valueOf(qty);
+                    String coloredQty = color + String.format("%4s", qtyDisplay) + RESET;
 
                     records.add(new String[]{
-                            String.valueOf(id), product, coloredType, coloredQty,
-                            String.valueOf(prev), String.valueOf(now), formattedDate
+                            String.valueOf(id),
+                            product,
+                            coloredType,
+                            coloredQty,
+                            String.valueOf(prev),
+                            String.valueOf(now),
+                            formattedDate
                     });
                 }
 
                 if (records.isEmpty()) {
                     System.out.println(RED + "No inventory logs found." + RESET);
-                    System.out.println("--------------------------------------------------------------------------------------------------");
                     MainDB.pause();
                     return;
                 }
 
-                final String format = "%-4s %-35s %-12s %-8s %-12s %-12s %-30s%n";
+                final String format = "%-3s │ %-30s │ %-6s │ %-4s │ %-10s │ %-10s │ %-25s%n";
                 Scanner scanner = new Scanner(System.in);
                 int pageSize = 10;
                 int currentPage = 0;
@@ -93,12 +87,13 @@ public class LogManager {
                 boolean running = true;
                 while (running) {
                     MainDB.clearScreen();
-                    System.out.println("==============================================================================================================");
-                    System.out.println("                                      INVENTORY LOG HISTORY");
-                    System.out.println("==============================================================================================================");
 
-                    System.out.printf(format, "ID", "Product", "Type", "Qty", "Prev Stock", "New Stock", "Date");
-                    System.out.println("--------------------------------------------------------------------------------------------------------------");
+                    // Header Box
+                    System.out.println("╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗");
+                    System.out.println("║                                     🧾  INVENTORY LOG HISTORY                                                          ║");
+                    System.out.println("╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
+                    System.out.printf(format, "ID", "Product Name", "Type", "Qty", "Prev Stock", "New Stock", "Date & Time");
+                    System.out.println("────┼────────────────────────────────┼────────┼──────┼────────────┼────────────┼──────────────────────────────");
 
                     int start = currentPage * pageSize;
                     int end = Math.min(start + pageSize, records.size());
@@ -108,25 +103,22 @@ public class LogManager {
                         System.out.printf(format, r[0], r[1], r[2], r[3], r[4], r[5], r[6]);
                     }
 
-                    System.out.println("--------------------------------------------------------------------------------------------------------------");
-                    System.out.printf("Page %d of %d%n", currentPage + 1, totalPages);
+                    System.out.println("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
+                    System.out.printf("📄 Page %d of %d%n", currentPage + 1, totalPages);
 
-                    System.out.println("");
-                    String options = "[X] Exit";
-                    if (currentPage > 0) options = "[B] Previous Page   " + options;
-                    if (currentPage < totalPages - 1) options = "[F] Next Page   " + options;
+                    // Options
+                    System.out.println();
+                    String options = "[X] ➜ Exit";
+                    if (currentPage > 0) options = "[B] ➜ Previous Page   " + options;
+                    if (currentPage < totalPages - 1) options = "[F] ➜ Next Page   " + options;
                     System.out.println(options);
 
                     System.out.print("Choose option: ");
                     String choice = scanner.nextLine().trim().toUpperCase();
 
                     switch (choice) {
-                        case "F" -> {
-                            if (currentPage < totalPages - 1) currentPage++;
-                        }
-                        case "B" -> {
-                            if (currentPage > 0) currentPage--;
-                        }
+                        case "F" -> { if (currentPage < totalPages - 1) currentPage++; }
+                        case "B" -> { if (currentPage > 0) currentPage--; }
                         case "X" -> running = false;
                         default -> {}
                     }
@@ -138,4 +130,5 @@ public class LogManager {
             MainDB.pause();
         }
     }
+
 }
