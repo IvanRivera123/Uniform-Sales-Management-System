@@ -22,25 +22,24 @@ public class MainDB {
 
             boolean running = true;
             while (running) {
-            	clearScreen();
-            	System.out.println("╔══════════════════════════════════════════════════════════════════╗");
-            	System.out.println("║            👔  UNIFORM SALES & MANAGEMENT SYSTEM                 ║");
-            	System.out.println("╚══════════════════════════════════════════════════════════════════╝");
+                clearScreen();
+                System.out.println("╔══════════════════════════════════════════════════════════════════╗");
+                System.out.println("║                UNIFORM SALES & MANAGEMENT SYSTEM                 ║");
+                System.out.println("╚══════════════════════════════════════════════════════════════════╝");
                 System.out.println("                  Developed by: Team UniformX");
                 System.out.println("────────────────────────────────────────────────────────────────────");
                 System.out.println("[1]   View All Available Products");
                 System.out.println("[2]   Login to Your Account");
-                System.out.println("[3]   Register New Account");
-                System.out.println("[4]   Exit Application");
+                System.out.println("[3]   Exit Application");
                 System.out.println("────────────────────────────────────────────────────────────────────");
                 System.out.print("Enter your choice ➤ ");
 
                 int choice = readInt();
+                if (choice == -1) continue;
                 switch (choice) {
-                    case 1 -> ProductManager.viewAllProducts(conn, sc, 0, false); 
+                    case 1 -> ProductManager.viewAllProducts(conn, sc, 0, false);
                     case 2 -> loginFlow(conn);
-                    case 3 -> UserManager.register(conn, "USER"); 
-                    case 4 -> {
+                    case 3 -> {
                         System.out.println(ORANGE + "Exiting... Goodbye!" + RESET);
                         pause();
                         running = false;
@@ -59,6 +58,12 @@ public class MainDB {
 
     private static void loginFlow(Connection conn) {
         Object[] userInfo = UserManager.login(conn);
+        if (userInfo == null) {
+            System.out.println(ORANGE + "Returning to Main Menu..." + RESET);
+            pause();
+            return;
+        }
+
         int userId = (int) userInfo[0];
         String loggedUser = (String) userInfo[1];
         String userRole = ((String) userInfo[2]).toUpperCase();
@@ -67,22 +72,24 @@ public class MainDB {
         boolean inside = true;
         while (inside) {
             clearScreen();
-            System.out.println("==================================================");
-            System.out.println("Logged in as: " + loggedUser + " (" + userRole + ")");
-            System.out.println("==================================================");
+            System.out.println("╔══════════════════════════════════════════════════════════════════╗");
+            System.out.printf("║ %-60s ║%n", "Logged in as: " + loggedUser + " (" + userRole + ")");
+            System.out.println("╚══════════════════════════════════════════════════════════════════╝");
 
             switch (userRole) {
                 case "USER" -> {
-                    System.out.println("1. View Products");
-                    System.out.println("2. View Cart");
-                    System.out.println("3. Submit Quotation Request");
-                    System.out.println("4. Logout");
-                    System.out.print("Enter choice: ");
+                    System.out.println("────────────────────────────────────────────────────────────────────");
+                    System.out.println("[1]   View Products");
+                    System.out.println("[2]   View Cart");
+                    System.out.println("[3]   Submit Quotation Request");
+                    System.out.println("[4]   Logout");
+                    System.out.println("────────────────────────────────────────────────────────────────────");
+                    System.out.print("Enter your choice ➤ ");
                     int choice = readInt();
                     switch (choice) {
                         case 1 -> ProductManager.viewAllProducts(conn, sc, userId, loggedIn);
-                        case 2 -> ProductManager.viewCart(conn, sc, loggedUser);
-                        case 3 -> SalesManager.submitQuotation(conn, sc, loggedUser);
+                        case 2 -> CartManager.viewCart(conn, sc, userId);
+                        case 3 -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
                         case 4 -> inside = false;
                         default -> {
                             System.out.println(RED + "Invalid choice!" + RESET);
@@ -99,9 +106,11 @@ public class MainDB {
                     inside = false;
                 }
                 case "ADMIN" -> {
-                    System.out.println("1. Manage User Accounts");
-                    System.out.println("2. Logout");
-                    System.out.print("Enter choice: ");
+                    System.out.println("────────────────────────────────────────────────────────────────────");
+                    System.out.println("[1]   Manage User Accounts");
+                    System.out.println("[2]   Logout");
+                    System.out.println("────────────────────────────────────────────────────────────────────");
+                    System.out.print("Enter your choice ➤ ");
                     int choice = readInt();
                     switch (choice) {
                         case 1 -> UserManager.userMenu(conn);
@@ -121,9 +130,11 @@ public class MainDB {
         }
     }
 
-    // UTILITIES
+    // Restored old clearScreen function
     public static void clearScreen() {
-        for (int i = 0; i < 50; i++) System.out.println();
+        for (int i = 0; i < 50; i++) {
+            System.out.println();
+        }
     }
 
     public static void pause() {
