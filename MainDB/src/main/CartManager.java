@@ -8,71 +8,82 @@ public class CartManager {
     // ==========================================================
     // ADD TO CART (DB VERSION)
     // ==========================================================
-    public static void addToCart(Connection conn, Scanner sc, int userId) {
-        try {
-            System.out.print("Enter Product ID to add: ");
-            int pid = Integer.parseInt(sc.nextLine().trim());
-            System.out.print("Enter quantity: ");
-            int qty = Integer.parseInt(sc.nextLine().trim());
+	public static void addToCart(Connection conn, Scanner sc, int userId) {
+	    try {
+	        System.out.print("Enter Product Code (e.g. P85957): ");
+	        String productCode = sc.nextLine().trim().toUpperCase();
 
-            // Check if product exists and has enough stock
-            String checkSql = "SELECT stock FROM products WHERE id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
-                ps.setInt(1, pid);
-                ResultSet rs = ps.executeQuery();
-                if (!rs.next()) {
-                    System.out.println(Colors.RED + "Product not found!" + Colors.RESET);
-                    MainDB.pause();
-                    return;
-                }
+	        
+	        if (!productCode.startsWith("P")) {
+	            System.out.println(Colors.YELLOW + "Invalid code format. It must start with 'P' (e.g., P85957)." + Colors.RESET);
+	            MainDB.pause();
+	            return;
+	        }
 
-                int stock = rs.getInt("stock");
-                if (qty > stock) {
-                    System.out.println(Colors.YELLOW + "Not enough stock. Available: " + stock + Colors.RESET);
-                    MainDB.pause();
-                    return;
-                }
-            }
+	        System.out.print("Enter quantity: ");
+	        int qty = Integer.parseInt(sc.nextLine().trim());
 
-            // Check if product already in cart
-            String existingSql = "SELECT quantity FROM cart WHERE user_id = ? AND product_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(existingSql)) {
-                ps.setInt(1, userId);
-                ps.setInt(2, pid);
-                ResultSet rs = ps.executeQuery();
+	       
+	        String checkSql = "SELECT id, stock FROM products WHERE product_code = ?";
+	        int pid = -1;
+	        int stock = 0;
 
-                if (rs.next()) {
-                    // Update existing quantity
-                    int newQty = rs.getInt("quantity") + qty;
-                    String updateSql = "UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?";
-                    try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
-                        updatePs.setInt(1, newQty);
-                        updatePs.setInt(2, userId);
-                        updatePs.setInt(3, pid);
-                        updatePs.executeUpdate();
-                    }
-                } else {
-                    // Insert new cart entry
-                    String insertSql = "INSERT INTO cart(user_id, product_id, quantity) VALUES (?, ?, ?)";
-                    try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
-                        insertPs.setInt(1, userId);
-                        insertPs.setInt(2, pid);
-                        insertPs.setInt(3, qty);
-                        insertPs.executeUpdate();
-                    }
-                }
-            }
+	        try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
+	            ps.setString(1, productCode);
+	            ResultSet rs = ps.executeQuery();
+	            if (!rs.next()) {
+	                System.out.println(Colors.RED + "Product not found!" + Colors.RESET);
+	                MainDB.pause();
+	                return;
+	            }
+	            pid = rs.getInt("id");
+	            stock = rs.getInt("stock");
+	        }
 
-            System.out.println(Colors.GREEN + "Added to cart!" + Colors.RESET);
+	     
+	        if (qty > stock) {
+	            System.out.println(Colors.YELLOW + "Not enough stock. Available: " + stock + Colors.RESET);
+	            MainDB.pause();
+	            return;
+	        }
 
-        } catch (SQLException e) {
-            System.out.println(Colors.RED + "Error adding to cart: " + e.getMessage() + Colors.RESET);
-        } catch (NumberFormatException e) {
-            System.out.println(Colors.YELLOW + "Invalid input. Please enter numbers only." + Colors.RESET);
-        }
+	   
+	        String existingSql = "SELECT quantity FROM cart WHERE user_id = ? AND product_id = ?";
+	        try (PreparedStatement ps = conn.prepareStatement(existingSql)) {
+	            ps.setInt(1, userId);
+	            ps.setInt(2, pid);
+	            ResultSet rs = ps.executeQuery();
 
-        MainDB.pause();
-    }
+	            if (rs.next()) {
+	                int newQty = rs.getInt("quantity") + qty;
+	                String updateSql = "UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?";
+	                try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
+	                    updatePs.setInt(1, newQty);
+	                    updatePs.setInt(2, userId);
+	                    updatePs.setInt(3, pid);
+	                    updatePs.executeUpdate();
+	                }
+	            } else {
+	                String insertSql = "INSERT INTO cart(user_id, product_id, quantity) VALUES (?, ?, ?)";
+	                try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
+	                    insertPs.setInt(1, userId);
+	                    insertPs.setInt(2, pid);
+	                    insertPs.setInt(3, qty);
+	                    insertPs.executeUpdate();
+	                }
+	            }
+	        }
+
+	        System.out.println(Colors.GREEN + "Added to cart!" + Colors.RESET);
+
+	    } catch (SQLException e) {
+	        System.out.println(Colors.RED + "Error adding to cart: " + e.getMessage() + Colors.RESET);
+	    } catch (NumberFormatException e) {
+	        System.out.println(Colors.YELLOW + "Invalid input. Please enter numbers only for quantity." + Colors.RESET);
+	    }
+
+	    MainDB.pause();
+	}
 
     // ==========================================================
     // VIEW CART (DB VERSION)
