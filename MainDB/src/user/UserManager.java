@@ -27,20 +27,15 @@ public class UserManager {
 
             System.out.print("Enter username ➤ ");
             String username = sc.nextLine().trim();
-            if (username.equalsIgnoreCase("back")) {
-                // Return null flag to stop double printing
-                return null;
-            }
+            if (username.equalsIgnoreCase("back")) return null;
 
             System.out.print("Enter password ➤ ");
             String password = sc.nextLine().trim();
-            if (password.equalsIgnoreCase("back")) {
-                return null;
-            }
+            if (password.equalsIgnoreCase("back")) return null;
 
             System.out.println(CYAN + "\nVerifying credentials..." + RESET);
 
-            String sql = "SELECT * FROM users WHERE username=? AND password=?";
+            String sql = "SELECT * FROM users WHERE username=? AND password=? AND active_status=1";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, username);
                 ps.setString(2, password);
@@ -65,50 +60,58 @@ public class UserManager {
         return new Object[] { userId, loggedUser, userRole, true };
     }
 
-    // ADMIN / MANAGER MENU
-    public static void userMenu(Connection conn) {
-        int choice = 0;
+    public static void userMenu(Connection conn, int loggedUserId, String loggedUserRole) {
+        String input = "";
         do {
             clearScreen();
-            System.out.println("=================================================================");
-            System.out.println("                     USER ACCOUNT MANAGEMENT");
-            System.out.println("=================================================================");
-            System.out.println("1. Add User");
-            System.out.println("2. View Users");
-            System.out.println("3. Edit User");
-            System.out.println("4. Delete User");
-            System.out.println("5. Back");
-            System.out.print("\nEnter choice: ");
+            System.out.println("╔═════════════════════════════════════════════════════════════╗");
+            System.out.println("║                   USER ACCOUNT MANAGEMENT                   ║");
+            System.out.println("╚═════════════════════════════════════════════════════════════╝");
+            System.out.println("[1] View Users");
+            System.out.println("[2] Add User");
+            System.out.println("[3] Edit User");
+            System.out.println("[4] Delete User");
+            System.out.println("");
+            System.out.println("[X] Back");
+            System.out.print("\nEnter choice ➤ ");
 
-            try {
-                choice = Integer.parseInt(sc.nextLine().trim());
-            } catch (NumberFormatException e) {
-                System.out.println(RED + "Invalid input! Enter a number." + RESET);
-                pause();
-                continue;
-            }
+            input = sc.nextLine().trim().toUpperCase();
 
-            switch (choice) {
-                case 1 -> addUser(conn);
-                case 2 -> viewUsers(conn);
-                case 3 -> editUser(conn);
-                case 4 -> deleteUser(conn);
-                case 5 -> {}
+            switch (input) {
+                case "1" -> addUser(conn);
+                case "2" -> viewUsers(conn);
+                case "3" -> {
+                    if (loggedUserRole.equals("ADMIN")) {
+                        editUser(conn, loggedUserId); 
+                    } else {
+                        System.out.println(RED + "Access denied! Only ADMIN can edit users." + RESET);
+                        pause();
+                    }
+                }
+                case "4" -> {
+                    if (loggedUserRole.equals("ADMIN")) {
+                        deleteUser(conn, loggedUserId); 
+                    } else {
+                        System.out.println(RED + "Access denied! Only ADMIN can delete users." + RESET);
+                        pause();
+                    }
+                }
+                case "X" -> {} // exit menu
                 default -> {
                     System.out.println(RED + "Invalid choice!" + RESET);
                     pause();
                 }
             }
-        } while (choice != 5);
+        } while (!input.equalsIgnoreCase("X"));
     }
 
     // ADD USER
     static void addUser(Connection conn) {
         try {
             clearScreen();
-            System.out.println("=================================================================");
-            System.out.println("                            ADD USER");
-            System.out.println("=================================================================");
+            System.out.println("╔════════════════════════════════════════════════════╗");
+            System.out.println("║                     ADD USER                       ║");
+            System.out.println("╚════════════════════════════════════════════════════╝");
             System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
 
             System.out.print("Username: ");
@@ -143,7 +146,7 @@ public class UserManager {
                 break;
             }
 
-            String sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+            String sql = "INSERT INTO users (username, password, role, active_status) VALUES (?, ?, ?, 1)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, username);
                 ps.setString(2, password);
@@ -159,42 +162,68 @@ public class UserManager {
         pause();
     }
 
+    // VIEW USERS
     static void viewUsers(Connection conn) {
         try {
             clearScreen();
-            System.out.println("=================================================================");
-            System.out.println("                           USER LIST");
-            System.out.println("=================================================================");
-            String sql = "SELECT id, username, role, created_at FROM users";
-            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-                System.out.printf("%-5s %-15s %-15s %-25s%n", "ID", "Username", "Role", "Created At");
-                System.out.println("---------------------------------------------------------------");
+            System.out.println("╔════════════════════════════════════════════════════════════════╗");
+            System.out.println("║                            USER LIST                           ║");
+            System.out.println("╚════════════════════════════════════════════════════════════════╝");
 
+            String sql = "SELECT id, username, role, created_at FROM users WHERE active_status=1";
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+                
+                
+                System.out.printf("%-5s│ %-20s│ %-15s│ %-25s%n", "ID", "Username", "Role", "Created At");
+                System.out.println("─────┼─────────────────────┼────────────────┼────────────────────────────");
+
+                boolean hasUsers = false;
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMMM dd, yyyy hh:mm a");
                 while (rs.next()) {
+                    hasUsers = true;
                     int id = rs.getInt("id");
                     String username = rs.getString("username");
+                    if (username.length() > 20) username = username.substring(0, 17) + "..."; 
                     String role = rs.getString("role");
                     Timestamp createdAt = rs.getTimestamp("created_at");
                     String formatted = (createdAt != null) ? sdf.format(createdAt) : "N/A";
-                    System.out.printf("%-5d %-15s %-15s %-25s%n", id, username, role, formatted);
+
+                    System.out.printf("%-5d│ %-20s│ %-15s│ %-25s%n", id, username, role, formatted);
                 }
+
+                if (!hasUsers) {
+                    System.out.println(YELLOW + "No users found." + RESET);
+                }
+
+                System.out.println("─────────────────────────────────────────────────────────────────────────");
             }
+
         } catch (SQLException e) {
             System.out.println(RED + "Error loading users: " + e.getMessage() + RESET);
         }
         pause();
     }
 
-    static void editUser(Connection conn) {
+
+ // EDIT USER
+    static void editUser(Connection conn, int adminId) {
         try {
             clearScreen();
-            System.out.println("=================================================================");
-            System.out.println("                           EDIT USER");
-            System.out.println("=================================================================");
+            System.out.println("╔════════════════════════════════════════════════════╗");
+            System.out.println("║                     EDIT USER                      ║");
+            System.out.println("╚════════════════════════════════════════════════════╝");
             System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
 
-            viewUsers(conn);
+            // Only show active users
+            String sqlList = "SELECT id, username, role FROM users WHERE active_status=1";
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlList)) {
+                System.out.printf("%-5s %-15s %-15s%n", "ID", "Username", "Role");
+                System.out.println("-----------------------------------");
+                while (rs.next()) {
+                    System.out.printf("%-5d %-15s %-15s%n", rs.getInt("id"), rs.getString("username"), rs.getString("role"));
+                }
+            }
+
             System.out.print("\nEnter user ID to edit: ");
             String input = sc.nextLine().trim();
             if (input.equalsIgnoreCase("back")) return;
@@ -208,25 +237,31 @@ public class UserManager {
                 return;
             }
 
-            String checkSql = "SELECT username, password, role FROM users WHERE id=?";
+            String checkSql = "SELECT username, password, role FROM users WHERE id=? AND active_status=1";
             try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
                 ps.setInt(1, id);
                 ResultSet rs = ps.executeQuery();
-
                 if (rs.next()) {
                     String currentUsername = rs.getString("username");
                     String currentPassword = rs.getString("password");
                     String currentRole = rs.getString("role");
 
-                    System.out.print("Enter current password for verification: ");
-                    String inputPass = sc.nextLine().trim();
-
-                    if (!inputPass.equals(currentPassword)) {
-                        System.out.println(RED + "Incorrect password! Access denied." + RESET);
-                        pause();
-                        return;
+                    // ADMIN verification
+                    System.out.print("Enter YOUR ADMIN password to continue: ");
+                    String adminPass = sc.nextLine().trim();
+                    String adminVerifySql = "SELECT id FROM users WHERE id=? AND password=? AND role='ADMIN' AND active_status=1";
+                    try (PreparedStatement adminPs = conn.prepareStatement(adminVerifySql)) {
+                        adminPs.setInt(1, adminId);
+                        adminPs.setString(2, adminPass);
+                        ResultSet adminRs = adminPs.executeQuery();
+                        if (!adminRs.next()) {
+                            System.out.println(RED + "Incorrect admin password! Access denied." + RESET);
+                            pause();
+                            return;
+                        }
                     }
 
+                    // EDIT FIELDS
                     System.out.print("New username (leave blank to keep '" + currentUsername + "'): ");
                     String newUsername = sc.nextLine().trim();
                     if (newUsername.isEmpty()) newUsername = currentUsername;
@@ -258,15 +293,25 @@ public class UserManager {
         pause();
     }
 
-    static void deleteUser(Connection conn) {
+    // DELETE USER (soft delete)
+    static void deleteUser(Connection conn, int adminId) {
         try {
             clearScreen();
-            System.out.println("=================================================================");
-            System.out.println("                           DELETE USER");
-            System.out.println("=================================================================");
+            System.out.println("╔═════════════════════════════════════════════════════╗");
+            System.out.println("║                     DELETE USER                     ║");
+            System.out.println("╚═════════════════════════════════════════════════════╝");
             System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
 
-            viewUsers(conn);
+            // Only show active users
+            String sqlList = "SELECT id, username FROM users WHERE active_status=1";
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlList)) {
+                System.out.printf("%-5s %-15s%n", "ID", "Username");
+                System.out.println("------------------------");
+                while (rs.next()) {
+                    System.out.printf("%-5d %-15s%n", rs.getInt("id"), rs.getString("username"));
+                }
+            }
+
             System.out.print("\nEnter user ID to delete: ");
             String input = sc.nextLine().trim();
             if (input.equalsIgnoreCase("back")) return;
@@ -280,38 +325,42 @@ public class UserManager {
                 return;
             }
 
-            String checkSql = "SELECT username, password FROM users WHERE id=?";
+            String checkSql = "SELECT username FROM users WHERE id=? AND active_status=1";
             try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
                 ps.setInt(1, id);
                 ResultSet rs = ps.executeQuery();
-
                 if (rs.next()) {
                     String username = rs.getString("username");
-                    String password = rs.getString("password");
 
-                    System.out.print("Enter password for '" + username + "' to confirm: ");
-                    String inputPass = sc.nextLine().trim();
-
-                    if (!inputPass.equals(password)) {
-                        System.out.println(RED + "Incorrect password! Deletion cancelled." + RESET);
-                        pause();
-                        return;
+                    // ADMIN verification
+                    System.out.print("Enter YOUR ADMIN password to confirm deletion: ");
+                    String adminPass = sc.nextLine().trim();
+                    String adminVerifySql = "SELECT id FROM users WHERE id=? AND password=? AND role='ADMIN' AND active_status=1";
+                    try (PreparedStatement adminPs = conn.prepareStatement(adminVerifySql)) {
+                        adminPs.setInt(1, adminId);
+                        adminPs.setString(2, adminPass);
+                        ResultSet adminRs = adminPs.executeQuery();
+                        if (!adminRs.next()) {
+                            System.out.println(RED + "Incorrect admin password! Deletion cancelled." + RESET);
+                            pause();
+                            return;
+                        }
                     }
 
-                    System.out.print(YELLOW + "Type CONFIRM DELETE to permanently delete this user: " + RESET);
+                    // CONFIRM DELETE
+                    System.out.print(YELLOW + "Are you sure you want to delete user '" + username + "'? (yes/no): " + RESET);
                     String confirm = sc.nextLine().trim();
-
-                    if (!confirm.equals("CONFIRM DELETE")) {
+                    if (!confirm.equalsIgnoreCase("yes")) {
                         System.out.println(YELLOW + "Deletion cancelled." + RESET);
                         pause();
                         return;
                     }
 
-                    String deleteSql = "DELETE FROM users WHERE id=?";
-                    try (PreparedStatement deletePs = conn.prepareStatement(deleteSql)) {
+                    String softDeleteSql = "UPDATE users SET active_status=0 WHERE id=?";
+                    try (PreparedStatement deletePs = conn.prepareStatement(softDeleteSql)) {
                         deletePs.setInt(1, id);
                         deletePs.executeUpdate();
-                        System.out.println(GREEN + "User deleted successfully!" + RESET);
+                        System.out.println(GREEN + "User deleted successfully (soft delete)!" + RESET);
                     }
                 } else {
                     System.out.println(RED + "User not found!" + RESET);
@@ -322,6 +371,7 @@ public class UserManager {
         }
         pause();
     }
+
 
     static void clearScreen() {
         for (int i = 0; i < 50; i++) System.out.println();
