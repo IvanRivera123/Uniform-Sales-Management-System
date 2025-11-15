@@ -12,7 +12,7 @@ public class ProductManager {
     // ==========================================================
     // MANAGE PRODUCTS MENU (Admin/Manager)
     // ==========================================================
-    public static void manageProducts(Connection conn, Scanner sc) {
+    public static void manageProducts(Connection conn, Scanner sc, String username, String role) {
         int choice = 0;
         do {
             try {
@@ -20,10 +20,15 @@ public class ProductManager {
                 System.out.println("╔══════════════════════════════════════════════════════════╗");
                 System.out.println("║                 PRODUCT MANAGEMENT MENU                  ║");
                 System.out.println("╚══════════════════════════════════════════════════════════╝");
-                System.out.println("[1]   Manage Products by Category");
-                System.out.println("[2]   View Inventory Logs");
-                System.out.println("[3]   Logout");
-                System.out.println("────────────────────────────────────────────────────────────");
+                
+                
+                System.out.println("            Logged in as: " + username + " (" + role.toUpperCase() + ")");
+                System.out.println("────────────────────────────────────────────────────────────────────");
+                
+                System.out.println("[1] Manage Products by Category");
+                System.out.println("[2] View Inventory Logs");
+                System.out.println("[3] Logout");
+                System.out.println("────────────────────────────────────────────────────────────────────");
                 System.out.print("Enter your choice ➤ ");
 
                 try {
@@ -49,18 +54,20 @@ public class ProductManager {
             }
         } while (choice != 3);
     }
+
+
     
     private static void manageProductsByCategory(Connection conn, Scanner sc) throws SQLException {
-        MainDB.clearScreen(); // <-- Clear screen before showing categories
+        MainDB.clearScreen(); 
 
         int categoryId = selectCategory(conn, sc);
-        if (categoryId == -1) return; // user chose Back
+        if (categoryId == -1) return;
 
-        int choice = 0; // declare here for the loop
+        int choice = 0; 
         do {
-            MainDB.clearScreen(); // Clear the screen before displaying products
+            MainDB.clearScreen(); 
             displayProductsByCategory(conn, categoryId);
-            MainDB.pause(); // Pause so user can read
+            MainDB.pause(); 
 
             System.out.println("\n[1] Add Product");
             System.out.println("[2] Edit Product");
@@ -93,57 +100,60 @@ public class ProductManager {
     // PUBLIC VIEW PRODUCTS (Users)
     // ==========================================================
     public static void viewAllProducts(Connection conn, Scanner sc, int userId, boolean loggedIn) {
-        int choice = 0;
         do {
             try {
                 MainDB.clearScreen();
+
+                // CATEGORY SELECTION
                 int categoryId = selectCategory(conn, sc);
-                if (categoryId == -1) return;
+                if (categoryId == -1) return; 
 
-                MainDB.clearScreen();
-                displayProductsByCategory(conn, categoryId);
+                boolean inCategory = true;
+                while (inCategory) {
+                    MainDB.clearScreen();
+                    displayProductsByCategory(conn, categoryId);
 
-                System.out.println("\nPress ENTER to continue...");
-                sc.nextLine();
+                    System.out.println("\nPress ENTER to continue...");
+                    sc.nextLine();
 
-                if (loggedIn) {
-                    System.out.println("1. Add to Cart");
-                    System.out.println("2. View Cart");
-                    System.out.println("3. Submit Quotation");
-                    System.out.println("4. Back");
-                    System.out.print("Enter choice: ");
-                    choice = Integer.parseInt(sc.nextLine().trim());
+                    if (loggedIn) {
+                        System.out.println("[1] Add to Cart");
+                        System.out.println("[2] View Cart");
+                        System.out.println("[3] Submit Quotation");
+                        System.out.println("");
+                        System.out.println("[X] Back");
+                        System.out.print("Enter choice: ");
+                        String choice = sc.nextLine().trim().toUpperCase();
 
-                    switch (choice) {
-                        case 1 -> CartManager.addToCart(conn, sc, userId);
-                        case 2 -> CartManager.viewCart(conn, sc, userId);
-                        case 3 -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
-                        case 4 -> {}
-                        default -> {
-                            System.out.println(RED + "Invalid choice!" + RESET);
+                        switch (choice) {
+                            case "1" -> CartManager.addToCart(conn, sc, userId);
+                            case "2" -> CartManager.viewCart(conn, sc, userId);
+                            case "3" -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
+                            case "X" -> inCategory = false; 
+                            default -> {
+                                System.out.println(RED + "Invalid choice!" + RESET);
+                                MainDB.pause();
+                            }
+                        }
+                    } else {
+                        System.out.println("[X] Back");
+                        System.out.print("Enter choice: ");
+                        String choice = sc.nextLine().trim().toUpperCase();
+                        if ("X".equals(choice)) inCategory = false;
+                        else {
+                            System.out.println(RED + "You must log in to perform that action!" + RESET);
                             MainDB.pause();
                         }
                     }
-                } else {
-                    System.out.println("1. Back");
-                    System.out.print("Enter choice: ");
-                    choice = Integer.parseInt(sc.nextLine().trim());
-                    if (choice != 1) {
-                        System.out.println(RED + "You must log in to perform that action!" + RESET);
-                        MainDB.pause();
-                    }
                 }
-            } catch (NumberFormatException e) {
-                System.out.println(RED + "Invalid input!" + RESET);
-                MainDB.pause();
-                choice = 0;
             } catch (SQLException e) {
                 System.out.println(RED + "Database error: " + e.getMessage() + RESET);
                 MainDB.pause();
-                choice = 0;
             }
-        } while (loggedIn ? choice != 4 : choice != 1);
+        } while (loggedIn); 
     }
+
+
 
     // ==========================================================
     // CATEGORY SELECTION
@@ -166,11 +176,15 @@ public class ProductManager {
                 names.add(rs.getString("name"));
                 System.out.printf("[%d] %s%n", index++, rs.getString("name"));
             }
-            
+
             System.out.println("");
-            System.out.printf("[%d] Back%n", index);
+            System.out.println("[X] Back");
             System.out.print("Select a category ➤ ");
             String input = sc.nextLine().trim();
+
+            if (input.equalsIgnoreCase("X")) {
+                return -1; 
+            }
 
             int choice;
             try {
@@ -181,7 +195,6 @@ public class ProductManager {
                 return selectCategory(conn, sc);
             }
 
-            if (choice == index) return -1;
             if (choice < 1 || choice > ids.size()) {
                 System.out.println(RED + "Invalid choice!" + RESET);
                 MainDB.pause();
@@ -211,7 +224,7 @@ public class ProductManager {
             System.out.println("║                                PRODUCT LIST                                        ║");
             System.out.println("╚════════════════════════════════════════════════════════════════════════════════════╝");
             System.out.printf("%-12s│ %-35s│ %-9s│ %-5s │ %-8s%n", "ID Code", "Product Name", "Price", "Stock", "Status");
-            System.out.println("────────────┼────────────────────────────────────┼──────────┼───────┼────────");
+            System.out.println("────────────┼────────────────────────────────────┼──────────┼───────┼───────────────────");
 
             boolean hasProducts = false;
             while (rs.next()) {
@@ -551,4 +564,6 @@ public class ProductManager {
             System.out.println(RED + "Error loading product list: " + e.getMessage() + RESET);
         }
     }
+    
+    
 }
