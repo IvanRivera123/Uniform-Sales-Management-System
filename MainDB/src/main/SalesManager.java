@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.File;
 
 public class SalesManager {
     static final String RESET = "\u001B[0m";
@@ -14,44 +18,56 @@ public class SalesManager {
     static final String YELLOW = "\u001B[33m";
 
     // Main sales menu
-    public static void salesMenu(Connection conn, Scanner sc, int userId) {
+    public static void salesMenu(Connection conn, Scanner sc, String username, String role, int userId) {
         int choice = 0;
         do {
-            MainDB.clearScreen();
-            System.out.println("===============================================================");
-            System.out.println("                       SALES MANAGEMENT MENU");
-            System.out.println("===============================================================");
-            System.out.println("1. Process Pending Quotation");
-            System.out.println("2. View Transaction History");
-            System.out.println("3. Back");
-            System.out.print("Enter choice: ");
-
             try {
-                choice = Integer.parseInt(sc.nextLine().trim());
-            } catch (NumberFormatException e) {
-                System.out.println(RED + "Invalid input! Enter a number." + RESET);
-                MainDB.pause();
-                continue;
-            }
+                MainDB.clearScreen();
+                System.out.println("╔══════════════════════════════════════════════════════════╗");
+                System.out.println("║                 SALES MANAGEMENT MENU                    ║");
+                System.out.println("╚══════════════════════════════════════════════════════════╝");
 
-            switch (choice) {
-                case 1 -> processPendingQuotation(conn, sc, userId);
-                case 2 -> TransactionHistory.viewTransactionHistory(conn);
-                case 3 -> { return; }
-                default -> {
-                    System.out.println(RED + "Invalid choice!" + RESET);
+                // Logged-in prompt
+                System.out.println("            Logged in as: " + username + " (" + role.toUpperCase() + ")");
+                System.out.println("────────────────────────────────────────────────────────────");
+
+                System.out.println("[1] Process Pending Quotation");
+                System.out.println("[2] View Transaction History");
+                System.out.println("[3] Back");
+                System.out.println("────────────────────────────────────────────────────────────");
+                System.out.print("Enter your choice ➤ ");
+
+                try {
+                    choice = Integer.parseInt(sc.nextLine().trim());
+                } catch (NumberFormatException e) {
+                    System.out.println(RED + "Invalid input! Please enter a number." + RESET);
                     MainDB.pause();
+                    continue;
                 }
+
+                switch (choice) {
+                    case 1 -> processPendingQuotation(conn, sc, userId);
+                    case 2 -> TransactionHistory.viewTransactionHistory(conn);
+                    case 3 -> {}
+                    default -> {
+                        System.out.println(RED + "Invalid choice!" + RESET);
+                        MainDB.pause();
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println(RED + "Error: " + e.getMessage() + RESET);
+                MainDB.pause();
             }
         } while (choice != 3);
     }
 
+
     // Process pending quotations and record sales
     public static void processPendingQuotation(Connection conn, Scanner sc, int userId) {
         MainDB.clearScreen();
-        System.out.println("=================================================================");
-        System.out.println("                       PROCESS PENDING QUOTATION");
-        System.out.println("=================================================================");
+        System.out.println("╔═══════════════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                        PENDING QUOTATIONS                                 ║");
+        System.out.println("╚═══════════════════════════════════════════════════════════════════════════╝");
 
         String sqlPending = """
             SELECT q.id, u.username, q.total_amount, q.status, q.created_at
@@ -68,28 +84,33 @@ public class SalesManager {
             List<String> users = new ArrayList<>();
             List<Double> totals = new ArrayList<>();
             List<Timestamp> createdAtList = new ArrayList<>();
-            int count = 0;
+            boolean hasQuotations = false;
 
-            System.out.printf("%-5s %-15s %-12s %-10s %-20s%n", "ID", "User", "Total", "Status", "Created At");
-            System.out.println("---------------------------------------------------------------");
+            // Table header
+            System.out.printf("%-8s│ %-20s│ %-11s│ %-10s│ %-20s%n",
+                    "ID", "User", "Total", "Status", "Created At");
+            System.out.println("────────┼─────────────────────┼────────────┼───────────┼────────────────────");
 
             while (rs.next()) {
+                hasQuotations = true;
                 int id = rs.getInt("id");
                 String user = rs.getString("username");
+                if (user.length() > 20) user = user.substring(0, 17) + "..."; 
                 double total = rs.getDouble("total_amount");
                 String status = rs.getString("status");
                 Timestamp createdAt = rs.getTimestamp("created_at");
 
-                System.out.printf("%-5d %-15s %-12.2f %-10s %-20s%n", id, user, total, status, createdAt);
+                System.out.printf("%-8d│ %-20s│ ₱%10.2f│ %-10s│ %-20s%n",
+                        id, user, total, status, createdAt);
+
                 quotationIds.add(id);
                 users.add(user);
                 totals.add(total);
                 createdAtList.add(createdAt);
-                count++;
             }
 
-            if (count == 0) {
-                System.out.println("No pending quotations.");
+            if (!hasQuotations) {
+                System.out.println(YELLOW + "No pending quotations found." + RESET);
                 MainDB.pause();
                 return;
             }
@@ -125,13 +146,12 @@ public class SalesManager {
                 else System.out.println(RED + "Invalid input! Enter Cash or GCash." + RESET);
             }
 
-            // Prepare to collect item details for receipt
+            // Prepare receipt details
             List<String> receiptProducts = new ArrayList<>();
             List<Integer> receiptQtys = new ArrayList<>();
             List<Double> receiptTotals = new ArrayList<>();
             double grandTotal = 0;
 
-            // Process each item in quotation
             String sqlItems = "SELECT product_id, quantity FROM quotation_items WHERE quotation_id=?";
             try (PreparedStatement psItems = conn.prepareStatement(sqlItems)) {
                 psItems.setInt(1, selectedId);
@@ -141,7 +161,6 @@ public class SalesManager {
                         int productId = rsItems.getInt("product_id");
                         int qty = rsItems.getInt("quantity");
 
-                        // Get current product stock and info
                         String sqlStock = "SELECT stock, name, price FROM products WHERE id=?";
                         try (PreparedStatement psStock = conn.prepareStatement(sqlStock)) {
                             psStock.setInt(1, productId);
@@ -176,7 +195,7 @@ public class SalesManager {
                                         psLog.executeUpdate();
                                     }
 
-                                    // Record sale with user_id
+                                    // Record sale
                                     try (PreparedStatement psSale = conn.prepareStatement(
                                             "INSERT INTO sales(product_id, quantity, total_price, payment_method, user_id) VALUES(?, ?, ?, ?, ?)")) {
                                         psSale.setInt(1, productId);
@@ -207,44 +226,136 @@ public class SalesManager {
                 psUpdate.executeUpdate();
             }
 
-            // Prepare receipt
+            // ===== Generate Receipt as Image =====
             String userHome = System.getProperty("user.home");
             String downloadsPath = userHome + File.separator + "Downloads";
-            File receiptFile = new File(downloadsPath, "receipt_" + selectedId + ".txt");
-            receiptFile.getParentFile().mkdirs(); // ensure folder exists
+            new File(downloadsPath).mkdirs(); // ensure folder exists
 
-            try (PrintWriter writer = new PrintWriter(receiptFile)) {
-                writer.println("========================================");
-                writer.println("             USMS STORE RECEIPT         ");
-                writer.println("========================================");
-                writer.printf("Receipt #: %d%n", selectedId);
-                writer.printf("Customer: %s%n", users.get(index));
-                writer.printf("Processed By User ID: %d%n", userId);
-                writer.printf("Date: %s%n", createdAtList.get(index));
-                writer.println("----------------------------------------");
-                writer.printf("%-20s %-5s %-10s%n", "Product", "Qty", "Total");
-                writer.println("----------------------------------------");
+            // === CONFIG ===
+            int width = 500;
+            int padding = 20;
+            int lineHeight = 25;
 
-                for (int i = 0; i < receiptProducts.size(); i++) {
-                    writer.printf("%-20s %-5d %-10.2f%n", receiptProducts.get(i), receiptQtys.get(i), receiptTotals.get(i));
-                }
+            // Height calculation (auto expand based on wrapped product lines)
+            int estimatedProductLines = 0;
 
-                writer.println("----------------------------------------");
-                writer.printf("Payment Method: %s%n", paymentMethod);
-                writer.printf("Grand Total: %.2f%n", grandTotal);
-                writer.println("========================================");
-                writer.println("Thank you for your purchase!");
+            for (String product : receiptProducts) {
+                int chunks = (int) Math.ceil(product.length() / 32.0); // wrap at ~32 chars
+                estimatedProductLines += chunks;
             }
 
+            int totalLines = 15 + estimatedProductLines;
+            int height = padding * 2 + lineHeight * totalLines;
+
+            BufferedImage receiptImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = receiptImage.createGraphics();
+
+            // Background
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, width, height);
+
+            // Smooth text
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            // ====== TITLE ======
+            g.setColor(new Color(30, 144, 255));
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("USMS SYSTEM ", padding, padding + lineHeight);
+
+            g.setColor(new Color(248, 238, 53));
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("STI College ProWare", padding, padding + lineHeight * 2);
+
+            int y = padding + lineHeight * 3;
+
+            // ====== INFO ======
+            g.setColor(Color.BLACK);
+            g.setFont(new Font("Arial", Font.PLAIN, 14));
+
+            g.drawString("Receipt No : " + selectedId, padding, y); y += lineHeight;
+            g.drawString("Customer   : " + users.get(index), padding, y); y += lineHeight;
+            g.drawString("Cashier ID : " + userId, padding, y); y += lineHeight;
+            g.drawString("Date       : " + createdAtList.get(index), padding, y); 
+            y += lineHeight + 5;
+
+            // line separator
+            g.drawLine(padding, y, width - padding, y);
+            y += lineHeight;
+
+            // ====== TABLE HEADER ======
+            g.setFont(new Font("Arial", Font.BOLD, 14));
+            g.drawString("Product", padding, y);
+            g.drawString("Qty", width - 160, y);
+            g.drawString("Amount", width - 80, y);
+            y += lineHeight;
+
+            g.drawLine(padding, y, width - padding, y);
+            y += lineHeight;
+
+            // ====== PRODUCTS (with auto-wrap) ======
+            g.setFont(new Font("Arial", Font.PLAIN, 14));
+
+            for (int i = 0; i < receiptProducts.size(); i++) {
+
+                String name = receiptProducts.get(i);
+                int qty = receiptQtys.get(i);
+                double total = receiptTotals.get(i);
+
+                // Wrap long names every 32 chars
+                while (name.length() > 32) {
+                    String chunk = name.substring(0, 32);
+                    g.drawString(chunk, padding, y);
+                    y += lineHeight;
+                    name = name.substring(32);
+                }
+
+                // Final line of product includes qty + total
+                g.drawString(name, padding, y);
+                g.drawString(String.valueOf(qty), width - 150, y);
+                g.drawString("₱" + String.format("%.2f", total), width - 80, y);
+                y += lineHeight;
+            }
+
+            g.drawLine(padding, y, width - padding, y);
+            y += lineHeight;
+
+            // ====== PAYMENT + TOTAL ======
+            g.drawString("Payment Method: " + paymentMethod, padding, y);
+            y += lineHeight;
+
+            g.drawLine(padding, y, width - padding, y);
+            y += lineHeight;
+
+            g.setFont(new Font("Arial", Font.BOLD, 16));
+            g.drawString("TOTAL DUE:", padding, y);
+            g.drawString("₱" + String.format("%.2f", grandTotal), width - 120, y);
+            y += lineHeight * 2;
+
+            // ====== FOOTER ======
+            g.setFont(new Font("Arial", Font.PLAIN, 14));
+            g.setColor(new Color(34, 139, 34));
+            g.drawString("We appreciate your purchase", padding, y);
+            y += lineHeight;
+
+         
+
+            // Finish
+            g.dispose();
+
+            File receiptFile = new File(downloadsPath, "receipt_" + selectedId + ".png");
+            ImageIO.write(receiptImage, "png", receiptFile);
+
             System.out.println(GREEN + "Quotation #" + selectedId + " processed successfully!" + RESET);
-            System.out.println(YELLOW + "Receipt saved to: " + receiptFile.getAbsolutePath() + RESET);
+            System.out.println(YELLOW + "Receipt saved as image: " + receiptFile.getAbsolutePath() + RESET);
+
             MainDB.pause();
 
-        } catch (SQLException | FileNotFoundException e) {
+        } catch (SQLException | java.io.IOException e) {
             System.out.println(RED + "Error processing quotation: " + e.getMessage() + RESET);
             MainDB.pause();
         }
     }
+
 
     // Submit a quotation from the user's cart
     public static void submitQuotation(Connection conn, Scanner sc, String username) {
