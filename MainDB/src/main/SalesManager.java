@@ -9,7 +9,7 @@ import java.io.PrintWriter;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
-import java.io.File;
+
 
 public class SalesManager {
     static final String RESET = "\u001B[0m";
