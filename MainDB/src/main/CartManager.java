@@ -2,6 +2,9 @@ package main;
 
 import java.sql.*;
 import java.util.Scanner;
+import java.util.List;
+import java.util.ArrayList;
+;
 
 public class CartManager {
 
@@ -88,147 +91,211 @@ public class CartManager {
     // ==========================================================
     // VIEW CART (DB VERSION)
     // ==========================================================
-    public static void viewCart(Connection conn, Scanner sc, int userId) {
-        try {
-            String sql = """
-                    SELECT c.id, p.name, p.price, c.quantity, (p.price * c.quantity) AS total
-                    FROM cart c
-                    JOIN products p ON c.product_id = p.id
-                    WHERE c.user_id = ?
-                    """;
+	public static void viewCart(Connection conn, Scanner sc, int userId) {
+	    try {
+	        String sql = """
+	                SELECT c.id, p.id AS product_id, p.name, p.price, c.quantity, (p.price * c.quantity) AS total
+	                FROM cart c
+	                JOIN products p ON c.product_id = p.id
+	                WHERE c.user_id = ?
+	                """;
 
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, userId);
-                ResultSet rs = ps.executeQuery();
+	        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+	            ps.setInt(1, userId);
+	            ResultSet rs = ps.executeQuery();
 
-                MainDB.clearScreen();
-                System.out.println("╔══════════════════════════════════════════════════════════════════════════╗");
-                System.out.println("║                                YOUR CART                                 ║");
-                System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
-                System.out.printf("%-5s│ %-25s│ %-10s│ %-8s│ %-10s%n", "ID", "Product", "Price", "Qty", "Total");
-                System.out.println("─────┼──────────────────────────┼───────────┼─────────┼─────────────────────");
+	            MainDB.clearScreen();
+	            System.out.println("╔══════════════════════════════════════════════════════════════════════════╗");
+	            System.out.println("║                                YOUR CART                                 ║");
+	            System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
+	            System.out.printf("%-5s│ %-25s│ %-10s│ %-8s│ %-10s%n", "ID", "Product", "Price", "Qty", "Total");
+	            System.out.println("─────┼──────────────────────────┼───────────┼─────────┼─────────────────────");
 
-                boolean hasItems = false;
-                double grandTotal = 0;
+	            boolean hasItems = false;
+	            double grandTotal = 0;
 
-                while (rs.next()) {
-                    hasItems = true;
-                    int id = rs.getInt("id");
-                    String product = rs.getString("name");
-                    double price = rs.getDouble("price");
-                    int qty = rs.getInt("quantity");
-                    double total = rs.getDouble("total");
-                    grandTotal += total;
+	            while (rs.next()) {
+	                hasItems = true;
+	                int id = rs.getInt("id");
+	                String product = rs.getString("name");
+	                double price = rs.getDouble("price");
+	                int qty = rs.getInt("quantity");
+	                double total = rs.getDouble("total");
+	                grandTotal += total;
 
-                    System.out.printf("%-5d│ %-25s│ ₱%-9.2f│ %-8d│ ₱%-9.2f%n",
-                            id, product, price, qty, total);
-                }
+	                // Truncate product names if too long
+	                if (product.length() > 25) product = product.substring(0, 22) + "...";
 
-                if (!hasItems) {
-                    System.out.println("────────────────────────────────────────────────────────────────────────────");
-                    System.out.println(Colors.YELLOW + "Your cart is empty!" + Colors.RESET);
-                } else {
-                    System.out.println("────────────────────────────────────────────────────────────────────────────");
-                    System.out.printf(Colors.GREEN + "\033[1mGrand Total: ₱%.2f\033[0m%n" + Colors.RESET, grandTotal);
-                }
-            }
+	                System.out.printf("%-5d│ %-25s│ ₱%-9.2f│ %-8d│ ₱%-9.2f%n",
+	                        id, product, price, qty, total);
+	            }
 
-        } catch (SQLException e) {
-            System.out.println(Colors.RED + "Error viewing cart: " + e.getMessage() + Colors.RESET);
-        }
+	            if (!hasItems) {
+	                System.out.println("────────────────────────────────────────────────────────────────────────────");
+	                System.out.println(Colors.YELLOW + "Your cart is empty!" + Colors.RESET);
+	            } else {
+	                System.out.println("────────────────────────────────────────────────────────────────────────────");
+	                System.out.printf(Colors.GREEN + "\033[1mGrand Total: ₱%.2f\033[0m%n" + Colors.RESET, grandTotal);
+	            }
+	        }
 
-        System.out.print("\nPress Enter to return...");
-        sc.nextLine();
-    }
+	    } catch (SQLException e) {
+	        System.out.println(Colors.RED + "Error viewing cart: " + e.getMessage() + Colors.RESET);
+	    }
+
+	    System.out.print("\nPress Enter to return...");
+	    sc.nextLine();
+	}
 
     // ==========================================================
     // SUBMIT QUOTATION (DB VERSION)
     // ==========================================================
-    public static void submitQuotation(Connection conn, Scanner sc, int userId, boolean loggedIn) {
-        if (!loggedIn) {
-            System.out.println(Colors.YELLOW + "You must register/login to submit quotation." + Colors.RESET);
-            MainDB.pause();
-            return;
-        }
+	public static void submitQuotation(Connection conn, Scanner sc, int userId, boolean loggedIn) {
+	    if (!loggedIn) {
+	        System.out.println(Colors.YELLOW + "You must register/login to submit quotation." + Colors.RESET);
+	        MainDB.pause();
+	        return;
+	    }
 
-        try {
-            // Check if cart has items
-            String checkCart = "SELECT COUNT(*) FROM cart WHERE user_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(checkCart)) {
-                ps.setInt(1, userId);
-                ResultSet rs = ps.executeQuery();
-                if (rs.next() && rs.getInt(1) == 0) {
-                    System.out.println(Colors.YELLOW + "Your cart is empty." + Colors.RESET);
-                    MainDB.pause();
-                    return;
-                }
-            }
+	    try {
+	        // Fetch cart items
+	        String fetchCart = """
+	                SELECT c.id, c.product_id, p.name, p.price, c.quantity, (p.price * c.quantity) AS total
+	                FROM cart c
+	                JOIN products p ON c.product_id = p.id
+	                WHERE c.user_id = ?
+	                """;
 
-            // Compute total
-            String totalSql = """
-                    SELECT SUM(p.price * c.quantity) AS total
-                    FROM cart c
-                    JOIN products p ON c.product_id = p.id
-                    WHERE c.user_id = ?
-                    """;
-            double totalAmount = 0;
-            try (PreparedStatement ps = conn.prepareStatement(totalSql)) {
-                ps.setInt(1, userId);
-                ResultSet rs = ps.executeQuery();
-                if (rs.next()) totalAmount = rs.getDouble("total");
-            }
+	        List<Integer> cartRowIds = new ArrayList<>(); 
+	        List<Integer> cartIds = new ArrayList<>();    
+	        List<String> cartNames = new ArrayList<>();
+	        List<Double> cartPrices = new ArrayList<>();
+	        List<Integer> cartQty = new ArrayList<>();
+	        List<Double> cartTotal = new ArrayList<>();
 
-            // Confirmation before submitting
-            System.out.printf(Colors.YELLOW + "Your total quotation amount is ₱%.2f%n" + Colors.RESET, totalAmount);
-            System.out.print("Do you want to submit this quotation? (Y/N): ");
-            String confirm = sc.nextLine().trim().toUpperCase();
+	        try (PreparedStatement ps = conn.prepareStatement(fetchCart)) {
+	            ps.setInt(1, userId);
+	            ResultSet rs = ps.executeQuery();
 
-            if (!confirm.equals("Y")) {
-                System.out.println(Colors.ORANGE + "Quotation submission canceled." + Colors.RESET);
-                MainDB.pause();
-                return;
-            }
+	            while (rs.next()) {
+	                cartRowIds.add(rs.getInt("id"));          
+	                cartIds.add(rs.getInt("product_id"));     
+	                cartNames.add(rs.getString("name"));
+	                cartPrices.add(rs.getDouble("price"));
+	                cartQty.add(rs.getInt("quantity"));
+	                cartTotal.add(rs.getDouble("total"));
+	            }
+	        }
 
-            // Create quotation record
-            String qSql = "INSERT INTO quotations(user_id, total_amount, status, created_at) VALUES(?, ?, 'PENDING', NOW())";
-            int quotationId = 0;
-            try (PreparedStatement ps = conn.prepareStatement(qSql, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setInt(1, userId);
-                ps.setDouble(2, totalAmount);
-                ps.executeUpdate();
-                ResultSet keys = ps.getGeneratedKeys();
-                if (keys.next()) quotationId = keys.getInt(1);
-            }
+	        if (cartIds.isEmpty()) {
+	            System.out.println(Colors.YELLOW + "Your cart is empty." + Colors.RESET);
+	            MainDB.pause();
+	            return;
+	        }
 
-            // Move items to quotation_items
-            String itemSql = """
-                    INSERT INTO quotation_items(quotation_id, product_id, quantity, subtotal)
-                    SELECT ?, c.product_id, c.quantity, (p.price * c.quantity)
-                    FROM cart c
-                    JOIN products p ON c.product_id = p.id
-                    WHERE c.user_id = ?
-                    """;
-            try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
-                ps.setInt(1, quotationId);
-                ps.setInt(2, userId);
-                ps.executeUpdate();
-            }
+	        // Show cart
+	        System.out.println("╔══════════════════════════════════════════════════════════╗");
+	        System.out.println("║                       YOUR CART                          ║");
+	        System.out.println("╚══════════════════════════════════════════════════════════╝");
+	        System.out.printf("%-4s │ %-25s │ %-6s  │ %-4s │ %-8s%n", "No.", "Product", "Price", "Qty", "Total");
+	        System.out.println("─────┼───────────────────────────┼─────────┼──────┼──────────");
 
-            // Clear user's cart
-            String clearSql = "DELETE FROM cart WHERE user_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(clearSql)) {
-                ps.setInt(1, userId);
-                ps.executeUpdate();
-            }
+	        for (int i = 0; i < cartIds.size(); i++) {
+	            String name = cartNames.get(i);
+	            if (name.length() > 25) name = name.substring(0, 22) + "..."; 
 
-            System.out.println(Colors.GREEN + "Quotation submitted! Sales Manager will process it." + Colors.RESET);
+	            System.out.printf("%-4d │ %-25s │ ₱%-5.2f │ %-4d │ ₱%-7.2f%n",
+	                    i + 1, name, cartPrices.get(i), cartQty.get(i), cartTotal.get(i));
+	        }
 
-        } catch (SQLException e) {
-            System.out.println(Colors.RED + "Error submitting quotation: " + e.getMessage() + Colors.RESET);
-        }
+	        // Options
+	        System.out.println("\nOptions:");
+	        System.out.println("[A] Submit All Products");
+	        System.out.println("[X] Cancel");
+	        System.out.println("[1-" + cartIds.size() + "] Submit a specific product");
 
-        MainDB.pause();
-    }
+	        System.out.print("Choose an option: ");
+	        String choice = sc.nextLine().trim().toUpperCase();
+
+	        List<Integer> selectedIndices = new ArrayList<>();
+	        if (choice.equals("A")) {
+	            for (int i = 0; i < cartIds.size(); i++) selectedIndices.add(i);
+	        } else if (choice.equals("X")) {
+	            System.out.println(Colors.ORANGE + "Quotation canceled." + Colors.RESET);
+	            MainDB.pause();
+	            return;
+	        } else {
+	            try {
+	                int index = Integer.parseInt(choice) - 1;
+	                if (index < 0 || index >= cartIds.size()) {
+	                    System.out.println(Colors.RED + "Invalid selection." + Colors.RESET);
+	                    MainDB.pause();
+	                    return;
+	                }
+	                selectedIndices.add(index);
+	            } catch (NumberFormatException e) {
+	                System.out.println(Colors.RED + "Invalid input." + Colors.RESET);
+	                MainDB.pause();
+	                return;
+	            }
+	        }
+
+	        // Compute total for selected items
+	        double totalAmount = 0;
+	        for (int i : selectedIndices) totalAmount += cartTotal.get(i);
+
+	        System.out.printf(Colors.YELLOW + "Your quotation total: ₱%.2f%n" + Colors.RESET, totalAmount);
+	        System.out.print("Confirm submission? (Y/N): ");
+	        String confirm = sc.nextLine().trim().toUpperCase();
+	        if (!confirm.equals("Y")) {
+	            System.out.println(Colors.ORANGE + "Quotation canceled." + Colors.RESET);
+	            MainDB.pause();
+	            return;
+	        }
+
+	        // Insert quotation
+	        int quotationId = 0;
+	        String qSql = "INSERT INTO quotations(user_id, total_amount, status, created_at) VALUES(?, ?, 'PENDING', NOW())";
+	        try (PreparedStatement psQ = conn.prepareStatement(qSql, Statement.RETURN_GENERATED_KEYS)) {
+	            psQ.setInt(1, userId);
+	            psQ.setDouble(2, totalAmount);
+	            psQ.executeUpdate();
+	            ResultSet keys = psQ.getGeneratedKeys();
+	            if (keys.next()) quotationId = keys.getInt(1);
+	        }
+
+	        // Move selected items to quotation_items
+	        String itemSql = "INSERT INTO quotation_items(quotation_id, product_id, quantity, subtotal) VALUES(?, ?, ?, ?)";
+	        try (PreparedStatement psItem = conn.prepareStatement(itemSql)) {
+	            for (int i : selectedIndices) {
+	                psItem.setInt(1, quotationId);
+	                psItem.setInt(2, cartIds.get(i));
+	                psItem.setInt(3, cartQty.get(i));
+	                psItem.setDouble(4, cartTotal.get(i));
+	                psItem.addBatch();
+	            }
+	            psItem.executeBatch();
+	        }
+
+	        // Remove selected items from cart
+	        String deleteSql = "DELETE FROM cart WHERE id = ?";
+	        try (PreparedStatement psDel = conn.prepareStatement(deleteSql)) {
+	            for (int i : selectedIndices) {
+	                psDel.setInt(1, cartRowIds.get(i)); 
+	                psDel.addBatch();
+	            }
+	            psDel.executeBatch();
+	        }
+
+	        System.out.println(Colors.GREEN + "Quotation submitted successfully!" + Colors.RESET);
+
+	    } catch (SQLException e) {
+	        System.out.println(Colors.RED + "Error submitting quotation: " + e.getMessage() + Colors.RESET);
+	    }
+
+	    MainDB.pause();
+	}
+
 
     // ==========================================================
     // COLORS CLASS (INLINE)
