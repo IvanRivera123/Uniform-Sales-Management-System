@@ -37,6 +37,8 @@ public class LogManager {
                 while (rs.next()) {
                     int id = rs.getInt("id");
                     String product = rs.getString("product_name");
+                    if (product.length() > 30) product = product.substring(0, 27) + "..."; // truncate long names
+
                     String type = rs.getString("change_type");
                     int qty = rs.getInt("quantity");
                     int prev = rs.getInt("previous_stock");
@@ -56,7 +58,6 @@ public class LogManager {
 
                     // Color-coded type & quantity
                     String coloredType = color + String.format("%-6s", type) + RESET;
-
                     String qtyDisplay = (type.equalsIgnoreCase("ADD") || type.equalsIgnoreCase("RESTOCK") || qty > 0)
                             ? "+" + qty : String.valueOf(qty);
                     String coloredQty = color + String.format("%4s", qtyDisplay) + RESET;
@@ -93,7 +94,7 @@ public class LogManager {
                     System.out.println("║                                             INVENTORY LOG HISTORY                                                    ║");
                     System.out.println("╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
                     System.out.printf(format, "ID", "Product Name", "Type", "Qty", "Prev Stock", "New Stock", "Date & Time");
-                    System.out.println("────┼────────────────────────────────┼────────┼──────┼────────────┼────────────┼──────────────────────────────");
+                    System.out.println("────┼────────────────────────────────┼────────┼──────┼────────────┼────────────┼────────────────────────────────────────");
 
                     int start = currentPage * pageSize;
                     int end = Math.min(start + pageSize, records.size());
@@ -130,5 +131,6 @@ public class LogManager {
             MainDB.pause();
         }
     }
+
 
 }
