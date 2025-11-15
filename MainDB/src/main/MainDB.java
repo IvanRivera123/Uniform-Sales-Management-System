@@ -71,10 +71,17 @@ public class MainDB {
 
         boolean inside = true;
         while (inside) {
-            clearScreen();
-            System.out.println("╔══════════════════════════════════════════════════════════════════╗");
-            System.out.printf("║ %-60s ║%n", "Logged in as: " + loggedUser + " (" + userRole + ")");
-            System.out.println("╚══════════════════════════════════════════════════════════════════╝");
+        	clearScreen();
+        	System.out.println("╔══════════════════════════════════════════════════════════════════╗");
+
+        	String header = "Logged in as: " + loggedUser + " (" + userRole + ")";
+        	int totalWidth = 66; 
+        	int padding = (totalWidth - header.length()) / 2;
+        	if (padding < 0) padding = 0; 
+        	String line = "║" + " ".repeat(padding) + header + " ".repeat(totalWidth - header.length() - padding) + "║";
+
+        	System.out.println(line);
+        	System.out.println("╚══════════════════════════════════════════════════════════════════╝");
 
             switch (userRole) {
                 case "USER" -> {
@@ -98,11 +105,11 @@ public class MainDB {
                     }
                 }
                 case "PRODUCTMANAGER" -> {
-                    ProductManager.manageProducts(conn, sc);
+                    ProductManager.manageProducts(conn, sc, loggedUser, userRole);
                     inside = false;
                 }
                 case "SALESMANAGER" -> {
-                    SalesManager.salesMenu(conn, sc, userId);
+                    SalesManager.salesMenu(conn, sc, loggedUser, userRole, userId);
                     inside = false;
                 }
                 case "ADMIN" -> {
@@ -113,7 +120,7 @@ public class MainDB {
                     System.out.print("Enter your choice ➤ ");
                     int choice = readInt();
                     switch (choice) {
-                        case 1 -> UserManager.userMenu(conn);
+                    case 1 -> UserManager.userMenu(conn, userId, userRole);
                         case 2 -> inside = false;
                         default -> {
                             System.out.println(RED + "Invalid choice!" + RESET);
