@@ -4,7 +4,14 @@ import java.sql.*;
 import java.util.Scanner;
 import java.util.List;
 import java.util.ArrayList;
-;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+
 
 public class CartManager {
 
@@ -166,8 +173,8 @@ public class CartManager {
 	                WHERE c.user_id = ?
 	                """;
 
-	        List<Integer> cartRowIds = new ArrayList<>(); 
-	        List<Integer> cartIds = new ArrayList<>();    
+	        List<Integer> cartRowIds = new ArrayList<>();
+	        List<Integer> cartIds = new ArrayList<>();
 	        List<String> cartNames = new ArrayList<>();
 	        List<Double> cartPrices = new ArrayList<>();
 	        List<Integer> cartQty = new ArrayList<>();
@@ -178,8 +185,8 @@ public class CartManager {
 	            ResultSet rs = ps.executeQuery();
 
 	            while (rs.next()) {
-	                cartRowIds.add(rs.getInt("id"));          
-	                cartIds.add(rs.getInt("product_id"));     
+	                cartRowIds.add(rs.getInt("id"));
+	                cartIds.add(rs.getInt("product_id"));
 	                cartNames.add(rs.getString("name"));
 	                cartPrices.add(rs.getDouble("price"));
 	                cartQty.add(rs.getInt("quantity"));
@@ -194,6 +201,7 @@ public class CartManager {
 	        }
 
 	        // Show cart
+	        MainDB.clearScreen();
 	        System.out.println("╔══════════════════════════════════════════════════════════╗");
 	        System.out.println("║                       YOUR CART                          ║");
 	        System.out.println("╚══════════════════════════════════════════════════════════╝");
@@ -202,17 +210,35 @@ public class CartManager {
 
 	        for (int i = 0; i < cartIds.size(); i++) {
 	            String name = cartNames.get(i);
-	            if (name.length() > 25) name = name.substring(0, 22) + "..."; 
-
-	            System.out.printf("%-4d │ %-25s │ ₱%-5.2f │ %-4d │ ₱%-7.2f%n",
-	                    i + 1, name, cartPrices.get(i), cartQty.get(i), cartTotal.get(i));
+	            int y = 0;
+	            if (name.length() <= 25) {
+	                System.out.printf("%-4d │ %-25s │ ₱%-5.2f │ %-4d │ ₱%-7.2f%n",
+	                        i + 1, name, cartPrices.get(i), cartQty.get(i), cartTotal.get(i));
+	            } else {
+	                // Wrap long names
+	                int maxChars = 25;
+	                int start = 0;
+	                while (start < name.length()) {
+	                    int end = Math.min(start + maxChars, name.length());
+	                    String part = name.substring(start, end);
+	                    if (start == 0) {
+	                        System.out.printf("%-4d │ %-25s │ ₱%-5.2f │ %-4d │ ₱%-7.2f%n",
+	                                i + 1, part, cartPrices.get(i), cartQty.get(i), cartTotal.get(i));
+	                    } else {
+	                        System.out.printf("     │ %-25s │ %-6s │ %-4s │ %-8s%n", part, "", "", "");
+	                    }
+	                    start += maxChars;
+	                }
+	            }
 	        }
+
+	        System.out.println("─────────────────────────────────────────────────────────────");
 
 	        // Options
 	        System.out.println("\nOptions:");
 	        System.out.println("[A] Submit All Products");
-	        System.out.println("[X] Cancel");
 	        System.out.println("[1-" + cartIds.size() + "] Submit a specific product");
+	        System.out.println("[X] Cancel");
 
 	        System.out.print("Choose an option: ");
 	        String choice = sc.nextLine().trim().toUpperCase();
@@ -245,10 +271,11 @@ public class CartManager {
 	        for (int i : selectedIndices) totalAmount += cartTotal.get(i);
 
 	        System.out.printf(Colors.YELLOW + "Your quotation total: ₱%.2f%n" + Colors.RESET, totalAmount);
-	        System.out.print("Confirm submission? (Y/N): ");
+	        System.out.print("Confirm submission? (Yes/No): ");
 	        String confirm = sc.nextLine().trim().toUpperCase();
-	        if (!confirm.equals("Y")) {
-	            System.out.println(Colors.ORANGE + "Quotation canceled." + Colors.RESET);
+
+	        if (!confirm.equals("YES")) {
+	            System.out.println(Colors.ORANGE + "Quotation canceled. Please enter a valid choice." + Colors.RESET);
 	            MainDB.pause();
 	            return;
 	        }
@@ -281,7 +308,7 @@ public class CartManager {
 	        String deleteSql = "DELETE FROM cart WHERE id = ?";
 	        try (PreparedStatement psDel = conn.prepareStatement(deleteSql)) {
 	            for (int i : selectedIndices) {
-	                psDel.setInt(1, cartRowIds.get(i)); 
+	                psDel.setInt(1, cartRowIds.get(i));
 	                psDel.addBatch();
 	            }
 	            psDel.executeBatch();
@@ -289,12 +316,91 @@ public class CartManager {
 
 	        System.out.println(Colors.GREEN + "Quotation submitted successfully!" + Colors.RESET);
 
+	        // ============================
+	        // Generate invoice image
+	        // ============================
+	        try {
+	            int padding = 20;
+	            int lineHeight = 25;
+	            int imageWidth = 700;
+	            int estimatedLines = selectedIndices.size() * 3 + 8; // extra for wrapped names
+	            int imageHeight = padding * 2 + lineHeight * estimatedLines;
+
+	            BufferedImage invoiceImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_RGB);
+	            Graphics2D g = invoiceImage.createGraphics();
+
+	            g.setColor(Color.WHITE);
+	            g.fillRect(0, 0, imageWidth, imageHeight);
+
+	            g.setColor(Color.BLACK);
+	            g.setFont(new Font("Monospaced", Font.PLAIN, 14));
+
+	            int y = padding;
+	            g.drawString("INVOICE", padding, y); y += lineHeight;
+	            g.drawString("Invoice No : " + quotationId, padding, y); y += lineHeight;
+	            g.drawString("User ID    : " + userId, padding, y); y += lineHeight;
+	            g.drawString("Date       : " + new Timestamp(System.currentTimeMillis()), padding, y); y += lineHeight;
+	            g.drawLine(padding, y, imageWidth - padding, y); y += lineHeight;
+
+	            g.drawString("PRODUCT", padding, y);
+	            g.drawString("QTY", imageWidth - 160, y);
+	            g.drawString("PRICE", imageWidth - 100, y);
+	            g.drawString("TOTAL", imageWidth - 40, y);
+	            y += lineHeight;
+	            g.drawLine(padding, y, imageWidth - padding, y); y += lineHeight;
+
+	            for (int i : selectedIndices) {
+	                String name = cartNames.get(i);
+	                int qty = cartQty.get(i);
+	                double price = cartPrices.get(i);
+	                double total = cartTotal.get(i);
+
+	                // Wrap long names
+	                List<String> wrappedLines = new ArrayList<>();
+	                int maxCharsPerLine = 40;
+	                while (name.length() > maxCharsPerLine) {
+	                    wrappedLines.add(name.substring(0, maxCharsPerLine));
+	                    name = name.substring(maxCharsPerLine);
+	                }
+	                wrappedLines.add(name);
+
+	                for (int j = 0; j < wrappedLines.size(); j++) {
+	                    String line = wrappedLines.get(j);
+	                    g.drawString(line, padding, y);
+	                    if (j == 0) {
+	                        g.drawString(String.valueOf(qty), imageWidth - 160, y);
+	                        g.drawString(String.format("%.2f", price), imageWidth - 100, y);
+	                        g.drawString(String.format("%.2f", total), imageWidth - 40, y);
+	                    }
+	                    y += lineHeight;
+	                }
+	            }
+
+	            g.drawLine(padding, y, imageWidth - padding, y); y += lineHeight;
+	            g.drawString("GRAND TOTAL: " + String.format("%.2f", totalAmount), padding, y);
+
+	            g.dispose();
+
+	            String userHome = System.getProperty("user.home");
+	            String downloadsPath = userHome + File.separator + "Downloads";
+	            new File(downloadsPath).mkdirs();
+
+	            File invoiceFile = new File(downloadsPath, "invoice_" + quotationId + ".png");
+	            ImageIO.write(invoiceImage, "png", invoiceFile);
+
+	            System.out.println(Colors.CYAN + "Invoice generated: " + invoiceFile.getAbsolutePath() + Colors.RESET);
+
+	        } catch (IOException e) {
+	            System.out.println(Colors.RED + "Failed to generate invoice: " + e.getMessage() + Colors.RESET);
+	        }
+
 	    } catch (SQLException e) {
 	        System.out.println(Colors.RED + "Error submitting quotation: " + e.getMessage() + Colors.RESET);
 	    }
 
 	    MainDB.pause();
 	}
+
 
 
     // ==========================================================
