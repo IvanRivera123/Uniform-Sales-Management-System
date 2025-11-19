@@ -78,8 +78,8 @@ public class UserManager {
             input = sc.nextLine().trim().toUpperCase();
 
             switch (input) {
-                case "1" -> addUser(conn);
-                case "2" -> viewUsers(conn);
+                case "2" -> addUser(conn);
+                case "1" -> viewUsers(conn);
                 case "3" -> {
                     if (loggedUserRole.equals("ADMIN")) {
                         editUser(conn, loggedUserId); 
@@ -166,9 +166,9 @@ public class UserManager {
     static void viewUsers(Connection conn) {
         try {
             clearScreen();
-            System.out.println("╔════════════════════════════════════════════════════════════════╗");
-            System.out.println("║                            USER LIST                           ║");
-            System.out.println("╚════════════════════════════════════════════════════════════════╝");
+            System.out.println("╔═══════════════════════════════════════════════════════════════════════╗");
+            System.out.println("║                               USER LIST                               ║");
+            System.out.println("╚═══════════════════════════════════════════════════════════════════════╝");
 
             String sql = "SELECT id, username, role, created_at FROM users WHERE active_status=1";
             try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -217,8 +217,9 @@ public class UserManager {
             // Only show active users
             String sqlList = "SELECT id, username, role FROM users WHERE active_status=1";
             try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlList)) {
-                System.out.printf("%-5s %-15s %-15s%n", "ID", "Username", "Role");
-                System.out.println("-----------------------------------");
+              	System.out.println("───────────────────────────────────────────────────────");
+            	System.out.printf("%-5s %-15s %-15s%n", "ID", "Username", "Role");
+            	System.out.println("───────────────────────────────────────────────────────");
                 while (rs.next()) {
                     System.out.printf("%-5d %-15s %-15s%n", rs.getInt("id"), rs.getString("username"), rs.getString("role"));
                 }
@@ -305,8 +306,9 @@ public class UserManager {
             // Only show active users
             String sqlList = "SELECT id, username FROM users WHERE active_status=1";
             try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlList)) {
-                System.out.printf("%-5s %-15s%n", "ID", "Username");
-                System.out.println("------------------------");
+            	System.out.println("───────────────────────────────────────────────────────");
+            	System.out.printf("%-5s %-15s%n", "ID", "Username");
+            	System.out.println("───────────────────────────────────────────────────────");
                 while (rs.next()) {
                     System.out.printf("%-5d %-15s%n", rs.getInt("id"), rs.getString("username"));
                 }
