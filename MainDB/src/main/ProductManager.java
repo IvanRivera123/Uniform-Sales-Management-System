@@ -26,6 +26,7 @@ public class ProductManager {
                 System.out.println("│ [1] Manage Products by Category    [X] Logout            │");
                 System.out.println("│ [2] Manage Categories                                    │");
                 System.out.println("│ [3] View Inventory Logs                                  │");
+                System.out.println("│ [4] Manage Restock                                       │");
                 System.out.println("╰──────────────────────────────────────────────────────────╯");
                 System.out.print("Enter your choice ➤ ");
 
@@ -35,6 +36,7 @@ public class ProductManager {
                     case "1" -> manageProductsByCategory(conn, sc);
                     case "2" -> CategoryManager.manageCategories(conn, sc);
                     case "3" -> LogManager.viewInventoryLog(conn);
+                    case "4" -> manageRestock(conn, sc, username);
                     case "X" -> {}
                     default -> {
                         System.out.println(RED + "Invalid choice!" + RESET);
@@ -142,6 +144,8 @@ public class ProductManager {
             }
         } while (loggedIn); 
     }
+    
+    
 
 
 
@@ -210,7 +214,7 @@ public class ProductManager {
     // DISPLAY PRODUCTS BY CATEGORY
     // ==========================================================
     private static void displayProductsByCategory(Connection conn, int categoryId) throws SQLException {
-    	String sql = "SELECT * FROM products WHERE category_id = ? AND active_status = 1 ORDER BY product_code";
+        String sql = "SELECT * FROM products WHERE category_id = ? AND active_status = 1 ORDER BY product_code";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, categoryId);
@@ -223,19 +227,24 @@ public class ProductManager {
             System.out.println("────────────┼────────────────────────────────────┼──────────┼───────┼───────────────────");
 
             boolean hasProducts = false;
+
             while (rs.next()) {
                 hasProducts = true;
-                String name = rs.getString("name");
-                if (name.length() > 35) name = name.substring(0, 32) + "...";
 
+                String code = rs.getString("product_code");
+                String name = rs.getString("name");
+                double price = rs.getDouble("price");
+                int totalStock = rs.getInt("stock");
                 String status = rs.getInt("active_status") == 1 ? "Active" : "Deactive";
 
+                // Trim name if too long
+                if (name.length() > 35) {
+                    name = name.substring(0, 32) + "...";
+                }
+
+                // Print product row only — no sizes
                 System.out.printf("%-12s│ %-35s│ ₱%7.2f │ %5d │ %-8s%n",
-                        rs.getString("product_code"),
-                        name,
-                        rs.getDouble("price"),
-                        rs.getInt("stock"),
-                        status);
+                        code, name, price, totalStock, status);
             }
 
             if (!hasProducts) {
@@ -245,6 +254,8 @@ public class ProductManager {
             System.out.println("────────────────────────────────────────────────────────────────────────────────────────");
         }
     }
+
+
 
 
     // ==========================================================
@@ -535,31 +546,196 @@ public class ProductManager {
         }
     }
 
-
-    private static void viewProductsQuick(Connection conn) {
+    public static void manageRestock(Connection conn, Scanner sc, String username) {
         try {
-            String sql = "SELECT * FROM products ORDER BY product_code";
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery(sql)) {
+            MainDB.clearScreen();
+            System.out.println("╔════════════════════════════════════════╗");
+            System.out.println("║            RESTOCK PRODUCTS            ║");
+            System.out.println("╚════════════════════════════════════════╝");
 
-                System.out.println();
-                System.out.println("ID Code     │ Product Name              │   Price    │ Stock");
-                System.out.println("────────────┼───────────────────────────┼────────────┼──────");
-
+            // 1️⃣ Choose Category
+            String sqlCategories = "SELECT id, name FROM categories WHERE active_status = 1 ORDER BY id ASC";
+            List<Integer> categoryIds = new ArrayList<>();
+            List<String> categoryNames = new ArrayList<>();
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlCategories)) {
+                int idx = 1;
+                System.out.println("\nChoose a category:");
                 while (rs.next()) {
-                    System.out.printf("%-10s │ %-25s │ ₱ %-8.2f │ %-5d%n",
-                            rs.getString("product_code"),
-                            rs.getString("name"),
-                            rs.getDouble("price"),
-                            rs.getInt("stock"));
+                    int catId = rs.getInt("id");
+                    String catName = rs.getString("name");
+                    categoryIds.add(catId);
+                    categoryNames.add(catName);
+                    System.out.printf("%d. %s%n", idx++, catName);
                 }
-
-                System.out.println("────────────────────────────────────────────────────────────");
             }
+
+            if (categoryIds.isEmpty()) {
+                System.out.println(YELLOW + "No categories available." + RESET);
+                MainDB.pause();
+                return;
+            }
+
+            System.out.print("Enter category number or BACK to exit: ");
+            String categoryChoice = sc.nextLine().trim().toUpperCase();
+            if (categoryChoice.equals("BACK")) return;
+
+            int selectedCategory;
+            try {
+                selectedCategory = Integer.parseInt(categoryChoice) - 1;
+                if (selectedCategory < 0 || selectedCategory >= categoryIds.size()) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                System.out.println(RED + "Invalid selection!" + RESET);
+                MainDB.pause();
+                return;
+            }
+            int categoryId = categoryIds.get(selectedCategory);
+
+            // ✅ Clear screen after choosing category
+            MainDB.clearScreen();
+
+            // 2️⃣ Choose Product (enhanced)
+            String sqlProducts = "SELECT id, name FROM products WHERE category_id = ? AND active_status = 1 ORDER BY name";
+            List<Integer> productIds = new ArrayList<>();
+            List<String> productNames = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sqlProducts)) {
+                ps.setInt(1, categoryId);
+                ResultSet rs = ps.executeQuery();
+                int idx = 1;
+                System.out.println("╔══════════════════════════════════════╗");
+                System.out.println("║         PRODUCTS TO RESTOCK          ║");
+                System.out.println("╚══════════════════════════════════════╝");
+                System.out.printf("%-4s │ %-30s%n", "No.", "Product Name");
+                System.out.println("─────┼─────────────────────────────────");
+                while (rs.next()) {
+                    int prodId = rs.getInt("id");
+                    String prodName = rs.getString("name");
+                    productIds.add(prodId);
+                    productNames.add(prodName);
+                    System.out.printf("%-4d │ %-30s%n", idx++, prodName);
+                }
+            }
+
+            if (productIds.isEmpty()) {
+                System.out.println(YELLOW + "No products in this category." + RESET);
+                MainDB.pause();
+                return;
+            }
+
+            System.out.print("\nEnter product number or BACK to exit: ");
+            String productChoice = sc.nextLine().trim().toUpperCase();
+            if (productChoice.equals("BACK")) return;
+
+            int selectedProduct;
+            try {
+                selectedProduct = Integer.parseInt(productChoice) - 1;
+                if (selectedProduct < 0 || selectedProduct >= productIds.size()) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                System.out.println(RED + "Invalid selection!" + RESET);
+                MainDB.pause();
+                return;
+            }
+            int productId = productIds.get(selectedProduct);
+
+            // ✅ Clear screen after choosing product
+            MainDB.clearScreen();
+
+            // 3️⃣ Show Sizes
+            String sqlSizes = "SELECT id, size, stock, damaged FROM product_sizes WHERE product_id = ? ORDER BY size";
+            List<Integer> sizeIds = new ArrayList<>();
+            List<Integer> stocks = new ArrayList<>();
+            List<Integer> damagedList = new ArrayList<>();
+            List<String> sizes = new ArrayList<>();
+
+            try (PreparedStatement ps = conn.prepareStatement(sqlSizes)) {
+                ps.setInt(1, productId);
+                ResultSet rs = ps.executeQuery();
+                int idx = 1;
+                System.out.println("\nAvailable sizes:");
+                System.out.printf("%-4s │ %-8s │ %-6s │ %-7s%n", "No.", "Size", "Stock", "Damaged");
+                System.out.println("─────┼─────────┼───────┼────────");
+                while (rs.next()) {
+                    sizeIds.add(rs.getInt("id"));
+                    sizes.add(rs.getString("size"));
+                    stocks.add(rs.getInt("stock"));
+                    damagedList.add(rs.getInt("damaged"));
+                    System.out.printf("%-4d │ %-8s │ %-6d │ %-7d%n", idx++, rs.getString("size"), rs.getInt("stock"), rs.getInt("damaged"));
+                }
+            }
+
+            if (sizeIds.isEmpty()) {
+                System.out.println(YELLOW + "No sizes available for this product." + RESET);
+                MainDB.pause();
+                return;
+            }
+
+            System.out.print("\nEnter size number to restock or BACK to exit: ");
+            String sizeChoice = sc.nextLine().trim().toUpperCase();
+            if (sizeChoice.equals("BACK")) return;
+
+            int selectedSize;
+            try {
+                selectedSize = Integer.parseInt(sizeChoice) - 1;
+                if (selectedSize < 0 || selectedSize >= sizeIds.size()) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                System.out.println(RED + "Invalid selection!" + RESET);
+                MainDB.pause();
+                return;
+            }
+
+            int receivedQty = 0, damagedQty = 0;
+
+            // Get valid received quantity
+            while (true) {
+                System.out.print("Enter quantity received (must be > 0): ");
+                try {
+                    receivedQty = Integer.parseInt(sc.nextLine().trim());
+                    if (receivedQty <= 0) throw new NumberFormatException();
+                    break;
+                } catch (NumberFormatException e) {
+                    System.out.println(RED + "Quantity must be a positive number!" + RESET);
+                }
+            }
+
+            // Get valid damaged quantity
+            while (true) {
+                System.out.print("Enter damaged quantity (0 - " + receivedQty + "): ");
+                try {
+                    damagedQty = Integer.parseInt(sc.nextLine().trim());
+                    if (damagedQty < 0 || damagedQty > receivedQty) throw new NumberFormatException();
+                    break;
+                } catch (NumberFormatException e) {
+                    System.out.println(RED + "Damaged quantity must be between 0 and received quantity!" + RESET);
+                }
+            }
+
+            int goodQty = receivedQty - damagedQty;
+            int selectedSizeId = sizeIds.get(selectedSize);
+            int prevStock = stocks.get(selectedSize);
+            int newStock = prevStock + goodQty;
+
+            // Update product_sizes
+            String sqlUpdate = "UPDATE product_sizes SET stock = stock + ?, `damaged` = `damaged` + ? WHERE id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
+                ps.setInt(1, goodQty);
+                ps.setInt(2, damagedQty);
+                ps.setInt(3, selectedSizeId);
+                ps.executeUpdate();
+            }
+
+            // Log restock
+            logInventoryChange(conn, selectedSizeId, "RESTOCK", goodQty, prevStock, newStock);
+
+            System.out.println(GREEN + "Restock complete! Good: " + goodQty + ", Damaged: " + damagedQty + RESET);
+            MainDB.pause();
+
         } catch (SQLException e) {
-            System.out.println(RED + "Error loading product list: " + e.getMessage() + RESET);
+            System.out.println(RED + "Error during restock: " + e.getMessage() + RESET);
+            MainDB.pause();
         }
     }
-    
+
+
+
+
     
 }
