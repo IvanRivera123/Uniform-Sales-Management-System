@@ -79,7 +79,7 @@ public class LogManager {
                     return;
                 }
 
-                final String format = "%-3s │ %-30s │ %-6s │ %-4s │ %-10s │ %-10s │ %-25s%n";
+                final String format = "%-3s │ %-30s │ %-10s │ %-5s │ %-10s │ %-10s │ %-25s%n";
                 Scanner scanner = new Scanner(System.in);
                 int pageSize = 10;
                 int currentPage = 0;
@@ -94,14 +94,30 @@ public class LogManager {
                     System.out.println("║                                             INVENTORY LOG HISTORY                                                    ║");
                     System.out.println("╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝");
                     System.out.printf(format, "ID", "Product Name", "Type", "Qty", "Prev Stock", "New Stock", "Date & Time");
-                    System.out.println("────┼────────────────────────────────┼────────┼──────┼────────────┼────────────┼────────────────────────────────────────");
+                    System.out.println("────┼────────────────────────────────┼────────────┼───────┼────────────┼────────────┼───────────────────────────────────");
 
                     int start = currentPage * pageSize;
                     int end = Math.min(start + pageSize, records.size());
 
                     for (int i = start; i < end; i++) {
                         String[] r = records.get(i);
-                        System.out.printf(format, r[0], r[1], r[2], r[3], r[4], r[5], r[6]);
+
+                        // Ensure color codes don't break alignment
+                        String typeText = String.format("%-10s", r[2].replaceAll("\u001B\\[[;\\d]*m", "")); // pad without color
+                        String coloredType = r[2].contains(RED) ? RED + typeText + RESET
+                                            : r[2].contains(GREEN) ? GREEN + typeText + RESET
+                                            : r[2].contains(YELLOW) ? YELLOW + typeText + RESET
+                                            : r[2].contains(MAGENTA) ? MAGENTA + typeText + RESET
+                                            : RESET + typeText + RESET;
+
+                        String qtyText = String.format("%5s", r[3].replaceAll("\u001B\\[[;\\d]*m", ""));
+                        String coloredQty = r[3].contains(RED) ? RED + qtyText + RESET
+                                          : r[3].contains(GREEN) ? GREEN + qtyText + RESET
+                                          : r[3].contains(YELLOW) ? YELLOW + qtyText + RESET
+                                          : r[3].contains(MAGENTA) ? MAGENTA + qtyText + RESET
+                                          : RESET + qtyText + RESET;
+
+                        System.out.printf(format, r[0], r[1], coloredType, coloredQty, r[4], r[5], r[6]);
                     }
 
                     System.out.println("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
