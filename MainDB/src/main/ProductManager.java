@@ -13,36 +13,29 @@ public class ProductManager {
     // MANAGE PRODUCTS MENU (Admin/Manager)
     // ==========================================================
     public static void manageProducts(Connection conn, Scanner sc, String username, String role) {
-        int choice = 0;
+        String input = "";
         do {
             try {
                 MainDB.clearScreen();
-                System.out.println("╔══════════════════════════════════════════════════════════╗");
-                System.out.println("║                 PRODUCT MANAGEMENT MENU                  ║");
-                System.out.println("╚══════════════════════════════════════════════════════════╝");
-                
-                
                 System.out.println("            Logged in as: " + username + " (" + role.toUpperCase() + ")");
-                System.out.println("────────────────────────────────────────────────────────────────────");
-                
-                System.out.println("[1] Manage Products by Category");
-                System.out.println("[2] View Inventory Logs");
-                System.out.println("[3] Logout");
-                System.out.println("────────────────────────────────────────────────────────────────────");
+                System.out.println("╔══════════════════════════════════════════════════════════╗");
+                System.out.println("║              PRODUCT MANAGEMENT MENU                     ║");
+                System.out.println("╚══════════════════════════════════════════════════════════╝");
+
+                System.out.println("╭──────────────────────── Options ─────────────────────────╮");
+                System.out.println("│ [1] Manage Products by Category    [X] Logout            │");
+                System.out.println("│ [2] Manage Categories                                    │");
+                System.out.println("│ [3] View Inventory Logs                                  │");
+                System.out.println("╰──────────────────────────────────────────────────────────╯");
                 System.out.print("Enter your choice ➤ ");
 
-                try {
-                    choice = Integer.parseInt(sc.nextLine().trim());
-                } catch (NumberFormatException e) {
-                    System.out.println(RED + "Invalid input! Please enter a number." + RESET);
-                    MainDB.pause();
-                    continue;
-                }
+                input = sc.nextLine().trim().toUpperCase();
 
-                switch (choice) {
-                    case 1 -> manageProductsByCategory(conn, sc);
-                    case 2 -> LogManager.viewInventoryLog(conn);
-                    case 3 -> {}
+                switch (input) {
+                    case "1" -> manageProductsByCategory(conn, sc);
+                    case "2" -> CategoryManager.manageCategories(conn, sc);
+                    case "3" -> LogManager.viewInventoryLog(conn);
+                    case "X" -> {}
                     default -> {
                         System.out.println(RED + "Invalid choice!" + RESET);
                         MainDB.pause();
@@ -52,48 +45,45 @@ public class ProductManager {
                 System.out.println(RED + "Error: " + e.getMessage() + RESET);
                 MainDB.pause();
             }
-        } while (choice != 3);
+        } while (!input.equals("X"));
     }
 
 
     
     private static void manageProductsByCategory(Connection conn, Scanner sc) throws SQLException {
-        MainDB.clearScreen(); 
-
-        int categoryId = selectCategory(conn, sc);
-        if (categoryId == -1) return;
-
-        int choice = 0; 
-        do {
+        while (true) { 
             MainDB.clearScreen(); 
-            displayProductsByCategory(conn, categoryId);
-            MainDB.pause(); 
+            int categoryId = selectCategory(conn, sc);
+            if (categoryId == -1) return; 
 
-            System.out.println("\n[1] Add Product");
-            System.out.println("[2] Edit Product");
-            System.out.println("[3] Delete Product");
-            System.out.println("[4] Back");
-            System.out.print("Enter choice ➤ ");
-
-            try {
-                choice = Integer.parseInt(sc.nextLine().trim());
-            } catch (NumberFormatException e) {
-                System.out.println(RED + "Invalid input!" + RESET);
+            while (true) { 
+                MainDB.clearScreen();
+                displayProductsByCategory(conn, categoryId);
                 MainDB.pause();
-                continue;
-            }
 
-            switch (choice) {
-                case 1 -> addProductToCategory(conn, sc, categoryId);
-                case 2 -> editProduct(conn, sc, categoryId);
-                case 3 -> deleteProduct(conn, sc, categoryId);
-                case 4 -> {}
-                default -> {
-                    System.out.println(RED + "Invalid choice!" + RESET);
-                    MainDB.pause();
+                System.out.println("\n[1] Add Product");
+                System.out.println("[2] Edit Product");
+                System.out.println("[3] Delete Product");
+                System.out.println("");
+                System.out.println("[X] Back to Categories");
+                System.out.print("Enter choice ➤ ");
+
+                String choice = sc.nextLine().trim().toUpperCase();
+                switch (choice) {
+                    case "1" -> addProductToCategory(conn, sc, categoryId);
+                    case "2" -> editProduct(conn, sc, categoryId);
+                    case "3" -> deleteProduct(conn, sc, categoryId);
+                    case "X" -> {
+                        break; 
+                    }
+                    default -> {
+                        System.out.println(RED + "Invalid choice!" + RESET);
+                        MainDB.pause();
+                    }
                 }
+                if (choice.equals("X")) break; 
             }
-        } while (choice != 4);
+        }
     }
 
     // ==========================================================
@@ -159,7 +149,7 @@ public class ProductManager {
     // CATEGORY SELECTION
     // ==========================================================
     private static int selectCategory(Connection conn, Scanner sc) throws SQLException {
-        String sql = "SELECT id, name FROM categories ORDER BY id";
+        String sql = "SELECT id, name FROM categories WHERE active_status = 1 ORDER BY id"; // only active categories
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
 
@@ -175,6 +165,12 @@ public class ProductManager {
                 ids.add(rs.getInt("id"));
                 names.add(rs.getString("name"));
                 System.out.printf("[%d] %s%n", index++, rs.getString("name"));
+            }
+
+            if (ids.isEmpty()) {
+                System.out.println(YELLOW + "No categories available." + RESET);
+                MainDB.pause();
+                return -1;
             }
 
             System.out.println("");
@@ -342,7 +338,7 @@ public class ProductManager {
             displayProductsByCategory(conn, categoryId);
 
             System.out.println(YELLOW + "\nType 'back' to return.\n" + RESET);
-            System.out.print("Enter Product Code to edit: ");
+            System.out.print("Enter Product Code to edit (e.g P22988): ");
             String code = sc.nextLine().trim();
             if (code.equalsIgnoreCase("back")) return;
 
@@ -429,7 +425,7 @@ public class ProductManager {
             displayProductsByCategory(conn, categoryId);
 
             System.out.println(YELLOW + "\nType 'back' to return." + RESET);
-            System.out.print("Enter Product Code to delete: ");
+            System.out.print("Enter Product Code to delete (e.g P22988): ");
             String code = sc.nextLine().trim();
             if (code.equalsIgnoreCase("back")) return;
 
