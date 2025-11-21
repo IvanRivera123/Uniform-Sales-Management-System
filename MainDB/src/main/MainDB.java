@@ -23,15 +23,15 @@ public class MainDB {
             boolean running = true;
             while (running) {
                 clearScreen();
-                System.out.println("╔══════════════════════════════════════════════════════════════════╗");
-                System.out.println("║                UNIFORM SALES & MANAGEMENT SYSTEM                 ║");
-                System.out.println("╚══════════════════════════════════════════════════════════════════╝");
-                System.out.println("                  Developed by: Team UniformX");
-                System.out.println("────────────────────────────────────────────────────────────────────");
-                System.out.println("[1]   View All Available Products");
-                System.out.println("[2]   Login to Your Account");
-                System.out.println("[3]   Exit Application");
-                System.out.println("────────────────────────────────────────────────────────────────────");
+                System.out.println("╔══════════════════════════════════════════════════════════╗");
+                System.out.println("║               UNIFORM SALES & MANAGEMENT SYSTEM          ║");
+                System.out.println("╚══════════════════════════════════════════════════════════╝");
+                System.out.println("                  Developed by: Team STI Student");
+                System.out.println("");
+                System.out.println("╭──────────────────────── Options ─────────────────────────╮");
+                System.out.println("│ [1] View All Products          [3] Exit Application      │");
+                System.out.println("│ [2] Login to Your Account                                │");
+                System.out.println("╰──────────────────────────────────────────────────────────╯");
                 System.out.print("Enter your choice ➤ ");
 
                 int choice = readInt();
@@ -84,26 +84,35 @@ public class MainDB {
         	System.out.println("╚══════════════════════════════════════════════════════════════════╝");
 
             switch (userRole) {
-                case "USER" -> {
-                    System.out.println("────────────────────────────────────────────────────────────────────");
-                    System.out.println("[1]   View Products");
-                    System.out.println("[2]   View Cart");
-                    System.out.println("[3]   Submit Quotation Request");
-                    System.out.println("[4]   Logout");
-                    System.out.println("────────────────────────────────────────────────────────────────────");
+            case "USER" -> {
+                String input = "";
+                do {
+                    MainDB.clearScreen();
+                    System.out.println("╔══════════════════════════════════════════════════════════╗");
+                    System.out.println("║                       USER MENU                          ║");
+                    System.out.println("╚══════════════════════════════════════════════════════════╝");
+
+                    System.out.println("╭──────────────────────── Options ─────────────────────────╮");
+                    System.out.println("│ [1] View Products                [X] Logout              │");
+                    System.out.println("│ [2] View Cart                                            │");
+                    System.out.println("│ [3] Submit Quotation Request                             │");
+                    System.out.println("╰──────────────────────────────────────────────────────────╯");
                     System.out.print("Enter your choice ➤ ");
-                    int choice = readInt();
-                    switch (choice) {
-                        case 1 -> ProductManager.viewAllProducts(conn, sc, userId, loggedIn);
-                        case 2 -> CartManager.viewCart(conn, sc, userId);
-                        case 3 -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
-                        case 4 -> inside = false;
+
+                    input = sc.nextLine().trim().toUpperCase();
+
+                    switch (input) {
+                        case "1" -> ProductManager.viewAllProducts(conn, sc, userId, loggedIn);
+                        case "2" -> CartManager.viewCart(conn, sc, userId);
+                        case "3" -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
+                        case "X" -> inside = false;
                         default -> {
                             System.out.println(RED + "Invalid choice!" + RESET);
-                            pause();
+                            MainDB.pause();
                         }
                     }
-                }
+                } while (!input.equals("X"));
+            }
                 case "PRODUCTMANAGER" -> {
                     ProductManager.manageProducts(conn, sc, loggedUser, userRole);
                     inside = false;
@@ -113,20 +122,8 @@ public class MainDB {
                     inside = false;
                 }
                 case "ADMIN" -> {
-                    System.out.println("────────────────────────────────────────────────────────────────────");
-                    System.out.println("[1]   Manage User Accounts");
-                    System.out.println("[2]   Logout");
-                    System.out.println("────────────────────────────────────────────────────────────────────");
-                    System.out.print("Enter your choice ➤ ");
-                    int choice = readInt();
-                    switch (choice) {
-                    case 1 -> UserManager.userMenu(conn, userId, userRole);
-                        case 2 -> inside = false;
-                        default -> {
-                            System.out.println(RED + "Invalid choice!" + RESET);
-                            pause();
-                        }
-                    }
+                	AdminManager.manageUsers(conn, sc, userId);
+                    inside = false;
                 }
                 default -> {
                     System.out.println(RED + "Unknown role! Logging out..." + RESET);
