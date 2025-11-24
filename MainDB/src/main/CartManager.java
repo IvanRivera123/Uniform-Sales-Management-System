@@ -156,12 +156,12 @@ public class CartManager {
 	    MainDB.pause();
 	}
     // ==========================================================
-    // VIEW CART (DB VERSION)
+    // VIEW CART 
     // ==========================================================
 	public static void viewCart(Connection conn, Scanner sc, int userId) {
 	    try {
 	        String sql = """
-	                SELECT c.id, p.id AS product_id, p.name, p.price, c.quantity, (p.price * c.quantity) AS total
+	                SELECT c.id, p.id AS product_id, p.name, p.price, c.quantity, c.size, (p.price * c.quantity) AS total
 	                FROM cart c
 	                JOIN products p ON c.product_id = p.id
 	                WHERE c.user_id = ?
@@ -172,11 +172,11 @@ public class CartManager {
 	            ResultSet rs = ps.executeQuery();
 
 	            MainDB.clearScreen();
-	            System.out.println("╔══════════════════════════════════════════════════════════════════════════╗");
-	            System.out.println("║                                YOUR CART                                 ║");
-	            System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
-	            System.out.printf("%-5s│ %-25s│ %-10s│ %-8s│ %-10s%n", "ID", "Product", "Price", "Qty", "Total");
-	            System.out.println("─────┼──────────────────────────┼───────────┼─────────┼─────────────────────");
+	            System.out.println("╔════════════════════════════════════════════════════════════════════════════════╗");
+	            System.out.println("║                                   YOUR CART                                    ║");
+	            System.out.println("╚════════════════════════════════════════════════════════════════════════════════╝");
+	            System.out.printf("%-5s│ %-25s│ %-8s│ %-8s│ %-8s│ %-10s%n", "ID", "Product", "Size", "Price", "Qty", "Total");
+	            System.out.println("─────┼──────────────────────────┼─────────┼─────────┼─────────┼─────────────────────");
 
 	            boolean hasItems = false;
 	            double grandTotal = 0;
@@ -185,6 +185,7 @@ public class CartManager {
 	                hasItems = true;
 	                int id = rs.getInt("id");
 	                String product = rs.getString("name");
+	                String size = rs.getString("size");
 	                double price = rs.getDouble("price");
 	                int qty = rs.getInt("quantity");
 	                double total = rs.getDouble("total");
@@ -193,15 +194,15 @@ public class CartManager {
 	                // Truncate product names if too long
 	                if (product.length() > 25) product = product.substring(0, 22) + "...";
 
-	                System.out.printf("%-5d│ %-25s│ ₱%-9.2f│ %-8d│ ₱%-9.2f%n",
-	                        id, product, price, qty, total);
+	                System.out.printf("%-5d│ %-25s│ %-8s│ ₱%-7.2f│ %-8d│ ₱%-9.2f%n",
+	                        id, product, size, price, qty, total);
 	            }
 
 	            if (!hasItems) {
-	                System.out.println("────────────────────────────────────────────────────────────────────────────");
+	                System.out.println("────────────────────────────────────────────────────────────────────────────────────");
 	                System.out.println(Colors.YELLOW + "Your cart is empty!" + Colors.RESET);
 	            } else {
-	                System.out.println("────────────────────────────────────────────────────────────────────────────");
+	                System.out.println("────────────────────────────────────────────────────────────────────────────────────");
 	                System.out.printf(Colors.GREEN + "\033[1mGrand Total: ₱%.2f\033[0m%n" + Colors.RESET, grandTotal);
 	            }
 	        }
@@ -213,6 +214,7 @@ public class CartManager {
 	    System.out.print("\nPress Enter to return...");
 	    sc.nextLine();
 	}
+
 
     // ==========================================================
     // SUBMIT QUOTATION (DB VERSION)
