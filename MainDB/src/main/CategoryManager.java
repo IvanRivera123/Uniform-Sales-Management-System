@@ -21,8 +21,8 @@ public class CategoryManager {
 
             System.out.println("╭───────────────────── Options ────────────────────────────╮");
             System.out.println("│ [1] View Categories           [4] Delete Category        │");
-            System.out.println("│ [2] Add Category              [5] Request Recovery       │");
-            System.out.println("│ [3] Edit Category             [X] Back                   │");
+            System.out.println("│ [2] Add Category              [X] Back                   │");
+            System.out.println("│ [3] Edit Category                                        │");
             System.out.println("╰──────────────────────────────────────────────────────────╯");
             System.out.print("Enter choice ➤ ");
 
@@ -33,7 +33,6 @@ public class CategoryManager {
                 case "2" -> addCategory(conn, sc);
                 case "3" -> editCategory(conn, sc);
                 case "4" -> deleteCategory(conn, sc);
-                case "5" -> requestRecovery(conn, sc);
                 case "X" -> {
                     return; 
                 }
@@ -45,6 +44,11 @@ public class CategoryManager {
         }
     }
 
+    private static String shorten(String text, int max) {
+        if (text.length() <= max) return text;
+        return text.substring(0, max - 3) + "...";
+    }
+    
     // ================================
     // DISPLAY CATEGORIES (NO PAUSE)
     // ================================
@@ -59,7 +63,8 @@ public class CategoryManager {
                 System.out.println("─────┼──────────────────────────────────────────────────────────");
 
                 while (rs.next()) {
-                    System.out.printf("%-4d │ %s%n", rs.getInt("id"), rs.getString("name"));
+                	String name = shorten(rs.getString("name"), 50);
+                	System.out.printf("%-4d │ %s%n", rs.getInt("id"), name);
                 }
 
                 System.out.println("─────┼──────────────────────────────────────────────────────────");
@@ -145,11 +150,9 @@ public class CategoryManager {
             System.out.print("");
             System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
 
-            System.out.print("\nEnter category ID to edit: ");
-            String idInput = sc.nextLine().trim();
-            if (idInput.equalsIgnoreCase("back")) return;
+            Integer id = MainDB.readInt(sc, "\nEnter category ID to edit: ");
+            if (id == null) return;
 
-            int id = Integer.parseInt(idInput);
 
             // New name
             String newName;
@@ -197,11 +200,9 @@ public class CategoryManager {
 
             System.out.print("");
             System.out.println(YELLOW + "Type 'back' at any time to go back.\n" + RESET);
-            System.out.print("\nEnter category ID to delete: ");
-            String idInput = sc.nextLine().trim();
-            if (idInput.equalsIgnoreCase("back")) return;
+            Integer id = MainDB.readInt(sc, "\nEnter category ID to delete: ");
+            if (id == null) return;
 
-            int id = Integer.parseInt(idInput);
 
             System.out.println(YELLOW + "This will delete the category. Products inside will NOT be deleted." + RESET);
             System.out.print("Type CONFIRM DELETE: ");
@@ -238,6 +239,7 @@ public class CategoryManager {
             System.out.println("╚══════════════════════════════════════════════════════════╝");
             System.out.println("╭───────────────────── Options ────────────────────────────╮");
             System.out.println("│ [1] Category Recovery        [2] Product Recovery        │");
+            System.out.println("│ [3] Check Status                                         │");
             System.out.println("│ [X] Back                                                 │");
             System.out.println("╰──────────────────────────────────────────────────────────╯");
             System.out.print("Enter choice ➤ ");
@@ -247,6 +249,7 @@ public class CategoryManager {
             switch (input) {
                 case "1" -> requestCategoryRecovery(conn, sc);
                 case "2" -> requestProductRecovery(conn, sc);
+                case "3" -> checkPendingStatus(conn);
                 case "X" -> { return; }
                 default -> {
                     System.out.println(RED + "Invalid choice!" + RESET);
@@ -255,6 +258,65 @@ public class CategoryManager {
             }
         }
     }
+
+    // ============================
+    // Check Pending Status
+    // ============================
+    private static void checkPendingStatus(Connection conn) {
+        try {
+            MainDB.clearScreen();
+            System.out.println("╔══════════════════════════════════════════════════════════╗");
+            System.out.println("║                    PENDING RECOVERY STATUS               ║");
+            System.out.println("╚══════════════════════════════════════════════════════════╝");
+
+            // Categories
+            String sqlCat = "SELECT id, name FROM categories WHERE active_status = 2 ORDER BY id";
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlCat)) {
+                System.out.println("\nPending Categories:");
+                System.out.println("ID   │ Category Name");
+                System.out.println("─────┼──────────────────────────────────────────────────────────");
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    String name = rs.getString("name");
+                    System.out.printf("%-4d │ %s%n", id, name);
+                }
+                System.out.println("─────┼──────────────────────────────────────────────────────────");
+            }
+
+            // Products
+            String sqlProd = """
+                SELECT p.id AS product_id, p.name AS product_name, c.name AS category_name
+                FROM products p
+                JOIN categories c ON p.category_id = c.id
+                WHERE p.active_status = 2
+                ORDER BY p.name, c.name
+            """;
+
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlProd)) {
+                System.out.println("\nPending Products:");
+                System.out.printf("%-4s │ %-40s │ %-40s%n", "ID", "Product Name", "Category");
+                System.out.println("─────┼──────────────────────────────────────────┼──────────────────────────────────────────────");
+                while (rs.next()) {
+                    int id = rs.getInt("product_id");
+                    String productName = rs.getString("product_name");
+                    String categoryName = rs.getString("category_name");
+
+                    String pName = shorten(productName, 40);
+                    String cName = shorten(categoryName, 40);
+
+                    System.out.printf("%-4d │ %-40s │ %-40s%n", id, pName, cName);
+                }
+                System.out.println("─────┼──────────────────────────────────────────┼──────────────────────────────────────────────");
+            }
+
+            MainDB.pause();
+
+        } catch (Exception e) {
+            System.out.println(RED + "Error checking pending status: " + e.getMessage() + RESET);
+            MainDB.pause();
+        }
+    }
+
 
     // ============================
     // Category Recovery
@@ -273,7 +335,9 @@ public class CategoryManager {
                 System.out.println("─────┼──────────────────────────────────────────────────────────");
                 while (rs.next()) {
                     ids.add(rs.getInt("id"));
-                    System.out.printf("%-4d │ %s%n", rs.getInt("id"), rs.getString("name"));
+                    String name = shorten(rs.getString("name"), 50);
+                    System.out.printf("%-4d │ %s%n", rs.getInt("id"), name);
+
                 }
                 System.out.println("─────┼──────────────────────────────────────────────────────────");
             }
@@ -284,13 +348,13 @@ public class CategoryManager {
                 return;
             }
 
-            System.out.println(YELLOW + "Inactive categories. Enter an ID to request recovery." + RESET);
-            System.out.println(YELLOW + "Type 'back' to cancel." + RESET);
-            System.out.print("Enter category ID: ");
-            String input = sc.nextLine().trim();
-            if (input.equalsIgnoreCase("back")) return;
+            System.out.println(YELLOW + "Enter a category ID to request recovery. Type 'back' to cancel." + RESET);
 
-            int selectedId = Integer.parseInt(input);
+            Integer selectedId = MainDB.readInt(sc, "Enter category ID: ");
+            if (selectedId == null) return;
+
+
+
             if (!ids.contains(selectedId)) {
                 System.out.println(RED + "Category ID not found!" + RESET);
                 MainDB.pause();
@@ -346,7 +410,10 @@ public class CategoryManager {
                     productMap.put(productId, productName);
                     productCategory.put(productId, categoryName);
 
-                    System.out.printf("%-4d │ %-40s │ %-40s%n", productId, productName, categoryName);
+                    String pName = shorten(productName, 40);
+                    String cName = shorten(categoryName, 40);
+
+                    System.out.printf("%-4d │ %-40s │ %-40s%n", productId, pName, cName);
                 }
 
                 System.out.println("─────┼──────────────────────────────────────────┼──────────────────────────────────────────────");
@@ -360,11 +427,9 @@ public class CategoryManager {
 
             System.out.println(YELLOW + "Enter a product ID to request recovery." + RESET);
             System.out.println(YELLOW + "Type 'back' to cancel." + RESET);
-            System.out.print("Enter product ID: ");
-            String input = sc.nextLine().trim();
-            if (input.equalsIgnoreCase("back")) return;
+            Integer selectedId = MainDB.readInt(sc, "Enter product ID: ");
+            if (selectedId == null) return;
 
-            int selectedId = Integer.parseInt(input);
             if (!productMap.containsKey(selectedId)) {
                 System.out.println(RED + "Product ID not found!" + RESET);
                 MainDB.pause();
