@@ -24,7 +24,7 @@ public class AdminManager {
         while (true) {
             MainDB.clearScreen();
             System.out.println("╔══════════════════════════════════════════════════════════╗");
-            System.out.println("║                           ADMIN MENU                     ║");
+            System.out.println("║                       ADMIN MENU                         ║");
             System.out.println("╚══════════════════════════════════════════════════════════╝");
 
             System.out.println("╭──────────────────────── Options ─────────────────────────╮");
