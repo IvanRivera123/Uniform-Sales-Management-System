@@ -25,6 +25,7 @@ public class UserManager {
             System.out.println(YELLOW + "Tip: Type 'back' to return to the Main Menu" + RESET);
             System.out.println("──────────────────────────────────────────────────────");
 
+            
             System.out.print("Enter username ➤ ");
             String username = sc.nextLine().trim();
             if (username.equalsIgnoreCase("back")) return null;
@@ -371,6 +372,81 @@ public class UserManager {
         } catch (SQLException e) {
             System.out.println(RED + "Error deleting user: " + e.getMessage() + RESET);
         }
+        pause();
+    }
+    
+    public static void changePassword(Connection conn, int userId, boolean loggedIn) {
+        if (!loggedIn) {
+            System.out.println(YELLOW + "You must be logged in to change your password." + RESET);
+            pause();
+            return;
+        }
+
+        try {
+            clearScreen();
+            System.out.println("╔══════════════════════════════════╗");
+            System.out.println("║          CHANGE PASSWORD         ║");
+            System.out.println("╚══════════════════════════════════╝");
+
+            // Get current password from DB
+            String sql = "SELECT password FROM users WHERE id = ?";
+            String currentPasswordInDB = null;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, userId);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    currentPasswordInDB = rs.getString("password");
+                } else {
+                    System.out.println(RED + "User not found!" + RESET);
+                    pause();
+                    return;
+                }
+            }
+
+            // Current password check
+            System.out.print("Enter your current password: ");
+            String currentInput = sc.nextLine().trim();
+            if (!currentInput.equals(currentPasswordInDB)) {
+                System.out.println(RED + "Incorrect current password!" + RESET);
+                pause();
+                return;
+            }
+
+            // New password input and confirmation
+            System.out.print("Enter new password: ");
+            String newPassword1 = sc.nextLine().trim();
+            System.out.print("Re-enter new password: ");
+            String newPassword2 = sc.nextLine().trim();
+
+            if (!newPassword1.equals(newPassword2)) {
+                System.out.println(RED + "Passwords do not match! Try again." + RESET);
+                pause();
+                return;
+            }
+
+            if (newPassword1.length() < 6) {
+                System.out.println(RED + "Password too short! Minimum 6 characters." + RESET);
+                pause();
+                return;
+            }
+
+            // Update password in DB
+            String updateSql = "UPDATE users SET password = ? WHERE id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                ps.setString(1, newPassword1);
+                ps.setInt(2, userId);
+                int updated = ps.executeUpdate();
+                if (updated > 0) {
+                    System.out.println(GREEN + "Password changed successfully!" + RESET);
+                } else {
+                    System.out.println(RED + "Failed to change password!" + RESET);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println(RED + "Error changing password: " + e.getMessage() + RESET);
+        }
+
         pause();
     }
 
