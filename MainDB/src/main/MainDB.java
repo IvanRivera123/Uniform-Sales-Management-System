@@ -55,6 +55,21 @@ public class MainDB {
             System.out.println(RED + "Database connection failed: " + e.getMessage() + RESET);
         }
     }
+    
+    public static Integer readInt(Scanner sc, String message) {
+        while (true) {
+            System.out.print(message);
+            String input = sc.nextLine().trim();
+
+            if (input.equalsIgnoreCase("back")) return null;
+
+            try {
+                return Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.println("\u001B[31mInvalid number!\u001B[0m");
+            }
+        }
+    }
 
     private static void loginFlow(Connection conn) {
         Object[] userInfo = UserManager.login(conn);
@@ -96,6 +111,7 @@ public class MainDB {
                     System.out.println("│ [1] View Products                [X] Logout              │");
                     System.out.println("│ [2] View Cart                                            │");
                     System.out.println("│ [3] Submit Quotation Request                             │");
+                    System.out.println("│ [4] Change Password                                      │");
                     System.out.println("╰──────────────────────────────────────────────────────────╯");
                     System.out.print("Enter your choice ➤ ");
 
@@ -105,6 +121,9 @@ public class MainDB {
                         case "1" -> ProductManager.viewAllProducts(conn, sc, userId, loggedIn);
                         case "2" -> CartManager.viewCart(conn, sc, userId);
                         case "3" -> CartManager.submitQuotation(conn, sc, userId, loggedIn);
+                        case "4" -> UserManager.changePassword(conn, userId, loggedIn);
+
+
                         case "X" -> inside = false;
                         default -> {
                             System.out.println(RED + "Invalid choice!" + RESET);
