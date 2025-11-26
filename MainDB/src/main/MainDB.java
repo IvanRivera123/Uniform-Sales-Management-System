@@ -20,6 +20,8 @@ public class MainDB {
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS)) {
             System.out.println(GREEN + "Connected to usms_db database!" + RESET);
 
+            CartManager.returnExpiredStock(conn);
+            
             boolean running = true;
             while (running) {
                 clearScreen();
