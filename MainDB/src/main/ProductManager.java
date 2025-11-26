@@ -225,8 +225,8 @@ public class ProductManager {
             System.out.println("╔════════════════════════════════════════════════════════════════════════════════════╗");
             System.out.println("║                                PRODUCT LIST                                        ║");
             System.out.println("╚════════════════════════════════════════════════════════════════════════════════════╝");
-            System.out.printf("%-12s│ %-35s│ %-9s│ %-5s │ %-8s%n", "ID Code", "Product Name", "Price", "Stock", "Status");
-            System.out.println("────────────┼────────────────────────────────────┼──────────┼───────┼───────────────────");
+            System.out.printf("%-12s│ %-35s│ %-9s│ %-5s%n", "ID Code", "Product Name", "Price", "Stock");
+            System.out.println("────────────┼────────────────────────────────────┼──────────┼───────");
 
             boolean hasProducts = false;
 
@@ -237,25 +237,23 @@ public class ProductManager {
                 String name = rs.getString("name");
                 double price = rs.getDouble("price");
                 int totalStock = rs.getInt("stock");
-                String status = rs.getInt("active_status") == 1 ? "Active" : "Deactive";
 
-                // Trim name if too long
                 if (name.length() > 35) {
                     name = name.substring(0, 32) + "...";
                 }
 
-                // Print product row only — no sizes
-                System.out.printf("%-12s│ %-35s│ ₱%7.2f │ %5d │ %-8s%n",
-                        code, name, price, totalStock, status);
+                System.out.printf("%-12s│ %-35s│ ₱%7.2f │ %5d%n",
+                        code, name, price, totalStock);
             }
 
             if (!hasProducts) {
                 System.out.println(YELLOW + "No products found in this category." + RESET);
             }
 
-            System.out.println("────────────────────────────────────────────────────────────────────────────────────────");
+            System.out.println("────────────────────────────────────────────────────────────────────");
         }
     }
+
 
 
 
@@ -295,38 +293,27 @@ public class ProductManager {
                 }
             }
 
-            // Stock
-            int stock = 0;
-            while (true) {
-                System.out.print("Stock: ");
-                String input = sc.nextLine().trim();
-                if (input.equalsIgnoreCase("back")) return;
-                try {
-                    stock = Integer.parseInt(input);
-                    if (stock < 0) throw new NumberFormatException();
-                    break;
-                } catch (NumberFormatException e) {
-                    System.out.println(RED + "Invalid stock!" + RESET);
-                }
-            }
-
-            // ✅ Generate product code
+            // Product code
             String productCode = generateProductCode();
 
-            String sql = "INSERT INTO products(product_code, name, price, stock, category_id) VALUES(?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO products(product_code, name, price, stock, category_id) VALUES(?, ?, ?, 0, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, productCode);
                 ps.setString(2, name);
                 ps.setDouble(3, price);
-                ps.setInt(4, stock);
-                ps.setInt(5, categoryId);
+                ps.setInt(4, categoryId);
                 ps.executeUpdate();
-
-                ResultSet keys = ps.getGeneratedKeys();
-                if (keys.next()) logInventoryChange(conn, keys.getInt(1), "ADD", stock, 0, stock);
 
                 System.out.println(GREEN + "Product added successfully!" + RESET);
                 System.out.println("Generated Product Code: " + YELLOW + productCode + RESET);
+
+                ResultSet keys = ps.getGeneratedKeys();
+                if (keys.next()) {
+                    int productId = keys.getInt(1);
+
+                    // 🔥 After creation, ask to create sizes
+                    askCreateSizes(conn, sc, productId);
+                }
             }
 
             MainDB.pause();
@@ -335,6 +322,79 @@ public class ProductManager {
             MainDB.pause();
         }
     }
+
+    
+    private static void askCreateSizes(Connection conn, Scanner sc, int productId) throws SQLException {
+        while (true) {
+            System.out.println("\nWould you like to add sizes for this product? (yes/no)");
+            System.out.print("> ");
+            String ans = sc.nextLine().trim();
+
+            if (ans.equalsIgnoreCase("no")) return;
+            if (!ans.equalsIgnoreCase("yes")) {
+                System.out.println(RED + "Please answer yes or no." + RESET);
+                continue;
+            }
+
+            addSizeToProduct(conn, sc, productId);
+        }
+    }
+
+    
+    private static void addSizeToProduct(Connection conn, Scanner sc, int productId) {
+        try {
+            String size;
+
+            while (true) {
+                System.out.print("Enter size label (e.g., S, M, L, 32, 34): ");
+                size = sc.nextLine().trim();
+
+                if (size.isEmpty()) {
+                    System.out.println(RED + "Size cannot be empty!" + RESET);
+                    continue;
+                }
+
+                String checkSql = "SELECT COUNT(*) FROM product_sizes WHERE product_id = ? AND LOWER(size) = LOWER(?)";
+                try (PreparedStatement check = conn.prepareStatement(checkSql)) {
+                    check.setInt(1, productId);
+                    check.setString(2, size);
+                    ResultSet rs = check.executeQuery();
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        System.out.println(RED + "This size already exists for this product!" + RESET);
+                        continue;
+                    }
+                }
+                break;
+            }
+
+            int critical;
+            while (true) {
+                System.out.print("Critical stock amount for this size: ");
+                String input = sc.nextLine().trim();
+                try {
+                    critical = Integer.parseInt(input);
+                    if (critical < 0) throw new NumberFormatException();
+                    break;
+                } catch (NumberFormatException e) {
+                    System.out.println(RED + "Invalid number!" + RESET);
+                }
+            }
+
+            String sql = "INSERT INTO product_sizes(product_id, size, stock, damaged, critical_stock) VALUES(?, ?, 0, 0, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, productId);
+                ps.setString(2, size);
+                ps.setInt(3, critical);
+                ps.executeUpdate();
+                System.out.println(GREEN + "Size added successfully!" + RESET);
+            }
+
+        } catch (SQLException e) {
+            System.out.println(RED + "Failed to add size: " + e.getMessage() + RESET);
+        }
+    }
+
+
 
 
     // ==========================================================
@@ -346,8 +406,7 @@ public class ProductManager {
             System.out.println("╔══════════════════════════════════════════════════════════╗");
             System.out.println("║                     EDIT PRODUCT MENU                    ║");
             System.out.println("╚══════════════════════════════════════════════════════════╝");
-            
-            // Display only active products in this category
+
             displayProductsByCategory(conn, categoryId);
 
             System.out.println(YELLOW + "\nType 'back' to return.\n" + RESET);
@@ -370,7 +429,6 @@ public class ProductManager {
                 int id = rs.getInt("id");
                 String currentName = rs.getString("name");
                 double currentPrice = rs.getDouble("price");
-                int currentStock = rs.getInt("stock");
 
                 System.out.println("\nEditing Product: " + currentName);
                 System.out.print("New name (leave blank to keep '" + currentName + "'): ");
@@ -390,31 +448,16 @@ public class ProductManager {
                     }
                 }
 
-                System.out.print("New stock (leave blank to keep '" + currentStock + "'): ");
-                String stockInput = sc.nextLine().trim();
-                int stock = currentStock;
-                if (!stockInput.isEmpty()) {
-                    try {
-                        stock = Integer.parseInt(stockInput);
-                    } catch (NumberFormatException e) {
-                        System.out.println(RED + "Invalid stock format!" + RESET);
-                        MainDB.pause();
-                        return;
-                    }
-                }
-
-                String updateSql = "UPDATE products SET name = ?, price = ?, stock = ? WHERE product_code = ?";
+                String updateSql = "UPDATE products SET name = ?, price = ? WHERE product_code = ?";
                 try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
                     ps.setString(1, name);
                     ps.setDouble(2, price);
-                    ps.setInt(3, stock);
-                    ps.setString(4, code);
+                    ps.setString(3, code);
                     ps.executeUpdate();
-
-                    int changeQty = stock - currentStock;
-                    logInventoryChange(conn, id, "EDIT", changeQty, currentStock, stock);
                     System.out.println(GREEN + "Product updated successfully!" + RESET);
                 }
+
+                editProductSizes(conn, sc, id);
             }
 
             MainDB.pause();
@@ -423,6 +466,85 @@ public class ProductManager {
             MainDB.pause();
         }
     }
+
+    
+    private static void editProductSizes(Connection conn, Scanner sc, int productId) {
+        while (true) {
+            MainDB.clearScreen();
+            System.out.println("╔══════════════════════════════════════════════════════╗");
+            System.out.println("║                      EDIT SIZES                      ║");
+            System.out.println("╚══════════════════════════════════════════════════════╝");
+
+            String sql = "SELECT id, size, critical_stock FROM product_sizes WHERE product_id = ? ORDER BY size";
+            
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, productId);
+                ResultSet rs = ps.executeQuery();
+
+                System.out.println("\nCurrent Sizes:");
+                while (rs.next()) {
+                    System.out.println("ID: " + rs.getInt("id") + " | Size: " + rs.getString("size") + " | Critical: " + rs.getInt("critical_stock"));
+                }
+            } catch (SQLException e) {
+                System.out.println(RED + "Error loading sizes: " + e.getMessage() + RESET);
+                MainDB.pause();
+                return;
+            }
+
+            System.out.println("\n1. Add Size");
+            System.out.println("2. Edit Size Critical Stock");
+            System.out.println("3. Delete Size");
+            System.out.println("4. Back");
+            System.out.print("Choose: ");
+            String choice = sc.nextLine().trim();
+
+            if (choice.equals("1")) {
+                addSizeToProduct(conn, sc, productId);
+            } 
+            else if (choice.equals("2")) {
+                System.out.print("Enter Size ID to edit: ");
+                String idInput = sc.nextLine().trim();
+                try {
+                    int sizeId = Integer.parseInt(idInput);
+
+                    System.out.print("New critical stock: ");
+                    int critical = Integer.parseInt(sc.nextLine().trim());
+
+                    String update = "UPDATE product_sizes SET critical_stock = ? WHERE id = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(update)) {
+                        ps.setInt(1, critical);
+                        ps.setInt(2, sizeId);
+                        ps.executeUpdate();
+                        System.out.println(GREEN + "Updated successfully!" + RESET);
+                    }
+                } catch (Exception e) {
+                    System.out.println(RED + "Invalid input!" + RESET);
+                }
+                MainDB.pause();
+            } 
+            else if (choice.equals("3")) {
+                System.out.print("Enter Size ID to delete: ");
+                String idInput = sc.nextLine().trim();
+                try {
+                    int sizeId = Integer.parseInt(idInput);
+
+                    String del = "DELETE FROM product_sizes WHERE id = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(del)) {
+                        ps.setInt(1, sizeId);
+                        ps.executeUpdate();
+                        System.out.println(GREEN + "Size deleted!" + RESET);
+                    }
+                } catch (Exception e) {
+                    System.out.println(RED + "Invalid input!" + RESET);
+                }
+                MainDB.pause();
+            } 
+            else if (choice.equals("4")) {
+                return;
+            }
+        }
+    }
+
 
     // ==========================================================
     // DELETE PRODUCT (with log)
@@ -593,29 +715,23 @@ public class ProductManager {
             LEFT JOIN product_sizes ps ON p.id = ps.product_id
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.active_status = 1
-            ORDER BY c.name, p.name, ps.size
+            ORDER BY ps.stock ASC, c.name, p.name, ps.size
         """;
 
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-            int categoryWidth = 50;   // wider category
-            int productWidth = 60;    // wider product name
+            List<String[]> records = new ArrayList<>();
+            int categoryWidth = 50;
+            int productWidth = 60;
             int sizeWidth = 8;
             int stockWidth = 7;
             int damagedWidth = 9;
             int statusWidth = 15;
 
-            // Header
-            System.out.printf("%-" + categoryWidth + "s │ %-" + productWidth + "s │ %-" + sizeWidth + "s │ %-" + stockWidth + "s │ %-" + damagedWidth + "s │ %-" + statusWidth + "s%n",
-                "Category", "Product Name", "Size", "Stock", "Damaged", "Status");
-
-            // Separator line
-            System.out.println("───────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┼──────────┼─────────┼───────────┼───────────────");
-
-            boolean hasData = false;
             while (rs.next()) {
-                hasData = true;
                 String category = rs.getString("category");
                 String name = rs.getString("product");
+                if (name == null) name = "-";
+                name = name.replace("\n", " ").replace("\r", " ");
                 String size = rs.getString("size") == null ? "-" : rs.getString("size");
                 int stock = rs.getInt("stock");
                 int damaged = rs.getInt("damaged");
@@ -630,16 +746,62 @@ public class ProductManager {
                 else if (stock <= critical) status = YELLOW + "Low Stock" + RESET;
                 else status = GREEN + "Safe Stock" + RESET;
 
-                System.out.printf("%-" + categoryWidth + "s │ %-" + productWidth + "s │ %-" + sizeWidth + "s │ %-" + stockWidth + "d │ %-" + damagedWidth + "d │ %-" + statusWidth + "s%n",
-                    category, name, size, stock, damaged, status);
+                records.add(new String[]{category, name, size, String.valueOf(stock), String.valueOf(damaged), status});
             }
 
-            if (!hasData) System.out.println(YELLOW + "No products/sizes found." + RESET);
-        }
+            if (records.isEmpty()) {
+                System.out.println(YELLOW + "No products/sizes found." + RESET);
+                MainDB.pause();
+                return;
+            }
 
-        System.out.println("\nPress ENTER to return...");
-        MainDB.pause();
+            Scanner scanner = new Scanner(System.in);
+            int pageSize = 20; // show 20 items per page
+            int currentPage = 0;
+            int totalPages = (int) Math.ceil((double) records.size() / pageSize);
+            boolean running = true;
+
+            while (running) {
+                MainDB.clearScreen();
+
+                // Header
+                System.out.printf("%-" + categoryWidth + "s │ %-" + productWidth + "s │ %-" + sizeWidth + "s │ %-" + stockWidth + "s │ %-" + damagedWidth + "s │ %-" + statusWidth + "s%n",
+                    "Category", "Product Name", "Size", "Stock", "Damaged", "Status");
+                System.out.println("───────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────┼──────────┼─────────┼───────────┼───────────────");
+
+                int start = currentPage * pageSize;
+                int end = Math.min(start + pageSize, records.size());
+
+                for (int i = start; i < end; i++) {
+                    String[] r = records.get(i);
+                    System.out.printf("%-" + categoryWidth + "s │ %-" + productWidth + "s │ %-" + sizeWidth + "s │ %-" + stockWidth + "s │ %-" + damagedWidth + "s │ %-" + statusWidth + "s%n",
+                        r[0], r[1], r[2], r[3], r[4], r[5]);
+                }
+
+                System.out.println("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────");
+                System.out.printf("📄 Page %d of %d%n", currentPage + 1, totalPages);
+
+                // Options
+                System.out.println();
+                String options = "[X] ➜ Exit";
+                if (currentPage > 0) options = "[B] ➜ Previous Page   " + options;
+                if (currentPage < totalPages - 1) options = "[F] ➜ Next Page   " + options;
+                System.out.println(options);
+
+                System.out.print("Choose option: ");
+                String choice = scanner.nextLine().trim().toUpperCase();
+
+                switch (choice) {
+                    case "F" -> { if (currentPage < totalPages - 1) currentPage++; }
+                    case "B" -> { if (currentPage > 0) currentPage--; }
+                    case "X" -> running = false;
+                    default -> {}
+                }
+            }
+        }
     }
+
+
 
 
 
@@ -744,7 +906,7 @@ public class ProductManager {
                         int idx = 1;
                         System.out.println("\nAvailable sizes:");
                         System.out.printf("%-4s │ %-8s │ %-6s │ %-7s%n", "No.", "Size", "Stock", "Damaged");
-                        System.out.println("─────┼─────────┼───────┼────────");
+                        System.out.println("─────┼──────────┼────────┼────────");
                         while (rs.next()) {
                             sizeIds.add(rs.getInt("id"));
                             sizes.add(rs.getString("size"));
