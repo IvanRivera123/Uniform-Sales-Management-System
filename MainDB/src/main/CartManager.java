@@ -81,7 +81,7 @@ public class CartManager {
 	        String sizeSql = """
 	                SELECT size, stock 
 	                FROM product_sizes 
-	                WHERE product_id = ? AND stock > 0
+	                WHERE product_id = ? 
 	                ORDER BY FIELD(size,'XS','S','M','L','XL','XXL','XXXL')
 	            """;
 
@@ -259,7 +259,7 @@ public class CartManager {
 
 	public static void submitQuotation(Connection conn, Scanner sc, int userId, boolean loggedIn) {
 	    if (!loggedIn) {
-	        System.out.println(Colors.YELLOW + "You must register/login to submit quotation." + Colors.RESET);
+	        System.out.println(Colors.YELLOW + "You must register/login to submit an Order." + Colors.RESET);
 	        MainDB.pause();
 	        return;
 	    }
@@ -348,7 +348,7 @@ public class CartManager {
 	        if (choice.equals("A")) {
 	            for (int i = 0; i < cartIds.size(); i++) selectedIndices.add(i);
 	        } else if (choice.equals("X")) {
-	            System.out.println(Colors.ORANGE + "Quotation canceled." + Colors.RESET);
+	            System.out.println(Colors.ORANGE + "Order canceled." + Colors.RESET);
 	            MainDB.pause();
 	            return;
 	        } else {
@@ -371,12 +371,12 @@ public class CartManager {
 	        double totalAmount = 0;
 	        for (int i : selectedIndices) totalAmount += cartTotal.get(i);
 
-	        System.out.printf(Colors.YELLOW + "Your quotation total: ₱%.2f%n" + Colors.RESET, totalAmount);
+	        System.out.printf(Colors.YELLOW + "Your Order total: ₱%.2f%n" + Colors.RESET, totalAmount);
 	        System.out.print("Confirm submission? (Yes/No): ");
 	        String confirm = sc.nextLine().trim().toUpperCase();
 
 	        if (!confirm.equals("YES")) {
-	            System.out.println(Colors.ORANGE + "Quotation canceled. Please enter a valid choice." + Colors.RESET);
+	            System.out.println(Colors.ORANGE + "Order canceled. Please enter a valid choice." + Colors.RESET);
 	            MainDB.pause();
 	            return;
 	        }
@@ -432,7 +432,7 @@ public class CartManager {
 	            psDel.executeBatch();
 	        }
 
-	        System.out.println(Colors.GREEN + "Quotation submitted successfully!" + Colors.RESET);
+	        System.out.println(Colors.GREEN + "Order submitted successfully!" + Colors.RESET);
 
 	        // ============================
 	        // Fetch username for invoice
@@ -536,7 +536,7 @@ public class CartManager {
 	        }
 
 	    } catch (SQLException e) {
-	        System.out.println(Colors.RED + "Error submitting quotation: " + e.getMessage() + Colors.RESET);
+	        System.out.println(Colors.RED + "Error submitting Order: " + e.getMessage() + Colors.RESET);
 	    }
 
 	    MainDB.pause();
