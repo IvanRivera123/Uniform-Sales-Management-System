@@ -29,17 +29,18 @@ public class SalesManager {
                 System.out.println("║                 SALES MANAGEMENT MENU                    ║");
                 System.out.println("╚══════════════════════════════════════════════════════════╝");
 
-                System.out.println("╭──────────────────────── Options ─────────────────────────╮");
-                System.out.println("│ [1] Process Pending Quotation      [X] Logout            │");
-                System.out.println("│ [2] View Transaction History                             │");
-                System.out.println("╰──────────────────────────────────────────────────────────╯");
+                System.out.println("╭──────────────────────── Options ───────────────────────────────╮");
+                System.out.println("│ [1] Sales Dashboard            [2] Process Pending Quotation   │");
+                System.out.println("│ [3] View Transaction History   [X] Logout                      │");
+                System.out.println("╰────────────────────────────────────────────────────────────────╯");
                 System.out.print("Enter your choice ➤ ");
 
                 input = sc.nextLine().trim().toUpperCase();
 
                 switch (input) {
-                    case "1" -> processPendingQuotation(conn, sc, userId);
-                    case "2" -> TransactionHistory.viewTransactionHistory(conn);
+                    case "1" -> SalesManager.viewSalesDashboard(conn);
+                    case "2" -> processPendingQuotation(conn, sc, userId);
+                    case "3" -> TransactionHistory.viewTransactionHistory(conn);
                     case "X" -> {}
                     default -> {
                         System.out.println(RED + "Invalid choice!" + RESET);
@@ -52,14 +53,111 @@ public class SalesManager {
             }
         } while (!input.equals("X"));
     }
+    
+    
+    public static void viewSalesDashboard(Connection conn) {
+        MainDB.clearScreen();
+        System.out.println("╔══════════════════════════════════════════════════════════════╗");
+        System.out.println("║                       SALES DASHBOARD                        ║");
+        System.out.println("╚══════════════════════════════════════════════════════════════╝");
+
+        try {
+            // --- Queries ---
+            String sqlWeekly = """
+                SELECT SUM(total_amount) AS weekly_sales
+                FROM quotations
+                WHERE status='completed'
+                AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
+            """;
+            String sqlMonthly = """
+                SELECT SUM(total_amount) AS monthly_sales
+                FROM quotations
+                WHERE status='completed'
+                AND YEAR(created_at) = YEAR(CURDATE())
+                AND MONTH(created_at) = MONTH(CURDATE())
+            """;
+            String sqlYearly = """
+                SELECT SUM(total_amount) AS yearly_sales
+                FROM quotations
+                WHERE status='completed'
+                AND YEAR(created_at) = YEAR(CURDATE())
+            """;
+            String sqlPopular = """
+                SELECT p.name, SUM(qi.quantity) AS total_sold
+                FROM quotation_items qi
+                JOIN products p ON qi.product_id = p.id
+                JOIN quotations q ON qi.quotation_id = q.id
+                WHERE q.status='completed'
+                GROUP BY p.id
+                ORDER BY total_sold DESC
+                LIMIT 5
+            """;
+
+            double weeklySales = 0, monthlySales = 0, yearlySales = 0;
+
+            try (Statement st = conn.createStatement()) {
+                try (ResultSet rs = st.executeQuery(sqlWeekly)) { if (rs.next()) weeklySales = rs.getDouble("weekly_sales"); }
+                try (ResultSet rs = st.executeQuery(sqlMonthly)) { if (rs.next()) monthlySales = rs.getDouble("monthly_sales"); }
+                try (ResultSet rs = st.executeQuery(sqlYearly)) { if (rs.next()) yearlySales = rs.getDouble("yearly_sales"); }
+            }
+
+            List<String> popularItems = new ArrayList<>();
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sqlPopular)) {
+                while (rs.next()) {
+                    popularItems.add(rs.getString("name") + " (" + rs.getInt("total_sold") + ")");
+                }
+            }
+
+            // --- Display ---
+            System.out.println("╭──────────────────────── Weekly Sales ────────────────────────╮");
+            System.out.printf("│ Total Sales This Week: " + SalesManager.GREEN + "₱%,.2f" + SalesManager.RESET + "%n", weeklySales);
+            System.out.println("╰──────────────────────────────────────────────────────────────╯\n");
+
+            System.out.println("╭──────────────────────── Monthly Sales ───────────────────────╮");
+            System.out.printf("│ Total Sales This Month: " + SalesManager.GREEN + "₱%,.2f" + SalesManager.RESET + "%n", monthlySales);
+            System.out.println("╰──────────────────────────────────────────────────────────────╯\n");
+
+            System.out.println("╭──────────────────────── Yearly Sales ────────────────────────╮");
+            System.out.printf("│ Total Sales This Year: " + SalesManager.GREEN + "₱%,.2f" + SalesManager.RESET + "%n", yearlySales);
+            System.out.println("╰──────────────────────────────────────────────────────────────╯\n");
+
+            // Popular Items with style
+            System.out.println("╭────────────────────────── Popular Items ─────────────────────────╮");
+            int boxWidth = 64; // width of the box inside borders
+
+            for (int i = 0; i < popularItems.size(); i++) {
+                String item = (i + 1) + ". " + popularItems.get(i);
+                while (item.length() > boxWidth) {
+                    // Print first part of item in the box
+                    System.out.printf("│ %-"+boxWidth+"s │%n", item.substring(0, boxWidth));
+                    // Reduce the item string
+                    item = "   " + item.substring(boxWidth); // indent continued line
+                }
+                // Print the remaining part
+                System.out.printf("│ %-"+boxWidth+"s │%n", item);
+            }
+            if (popularItems.isEmpty()) {
+                System.out.printf("│ %-"+boxWidth+"s │%n", "No popular items yet.");
+            }
+            System.out.println("╰──────────────────────────────────────────────────────────────────╯");
+
+            System.out.println("Press Enter to return to the menu...");
+            new Scanner(System.in).nextLine();
+
+        } catch (SQLException e) {
+            System.out.println(SalesManager.RED + "Error loading dashboard: " + e.getMessage() + SalesManager.RESET);
+            MainDB.pause();
+        }
+    }
+
 
 
     // Process pending quotations and record sales
     public static void processPendingQuotation(Connection conn, Scanner sc, int userId) {
         MainDB.clearScreen();
-        System.out.println("╔═══════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                        PENDING QUOTATIONS                                 ║");
-        System.out.println("╚═══════════════════════════════════════════════════════════════════════════╝");
+        System.out.println("╔═════════════════════════════════════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                                         PENDING QUOTATIONS                                      ║");
+        System.out.println("╚═════════════════════════════════════════════════════════════════════════════════════════════════╝");
 
         String sqlPending = """
             SELECT q.invoice_number, u.username, q.total_amount, q.created_at
@@ -78,7 +176,7 @@ public class SalesManager {
             // Table header
             System.out.printf("%-12s│ %-15s│ %-25s│ %-8s │ %-20s%n",
                     "Invoice No", "User", "Product (Size)", "Total", "Created At");
-            System.out.println("────────────┼────────────────┼──────────────────────────┼──────────┼──────────────────────────");
+            System.out.println("────────────┼────────────────┼──────────────────────────┼──────────┼────────────────────────────────");
 
             while (rs.next()) {
                 hasQuotations = true;
@@ -288,7 +386,7 @@ public class SalesManager {
             // Title
             g.setColor(new Color(30, 144, 255));
             g.setFont(new Font("Arial", Font.BOLD, 22));
-            g.drawString("USMS SYSTEM ", padding, padding + lineHeight);
+            g.drawString("UNITRACK ", padding, padding + lineHeight);
             g.setColor(new Color(248, 238, 53));
             g.drawString("STI College ProWare", padding, padding + lineHeight * 2);
 
