@@ -28,7 +28,7 @@ public class MainDB {
                 System.out.println("╔══════════════════════════════════════════════════════════╗");
                 System.out.println("║               UNIFORM SALES & MANAGEMENT SYSTEM          ║");
                 System.out.println("╚══════════════════════════════════════════════════════════╝");
-                System.out.println("                  Developed by: Team STI Student");
+                System.out.println("                  Developed by: STI Student");
                 System.out.println("");
                 System.out.println("╭──────────────────────── Options ─────────────────────────╮");
                 System.out.println("│ [1] View All Products          [3] Exit Application      │");
