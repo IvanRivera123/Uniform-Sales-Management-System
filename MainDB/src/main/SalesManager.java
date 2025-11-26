@@ -30,7 +30,7 @@ public class SalesManager {
                 System.out.println("╚══════════════════════════════════════════════════════════╝");
 
                 System.out.println("╭──────────────────────── Options ───────────────────────────────╮");
-                System.out.println("│ [1] Sales Dashboard            [2] Process Pending Quotation   │");
+                System.out.println("│ [1] Sales Dashboard            [2] Process Pending Orders      │");
                 System.out.println("│ [3] View Transaction History   [X] Logout                      │");
                 System.out.println("╰────────────────────────────────────────────────────────────────╯");
                 System.out.print("Enter your choice ➤ ");
@@ -156,7 +156,7 @@ public class SalesManager {
     public static void processPendingQuotation(Connection conn, Scanner sc, int userId) {
         MainDB.clearScreen();
         System.out.println("╔═════════════════════════════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                                         PENDING QUOTATIONS                                      ║");
+        System.out.println("║                                         PENDING ORDERS                                          ║");
         System.out.println("╚═════════════════════════════════════════════════════════════════════════════════════════════════╝");
 
         String sqlPending = """
@@ -488,14 +488,14 @@ public class SalesManager {
                         psClear.setInt(1, userId);
                         psClear.executeUpdate();
                     }
-                    System.out.println("Quotation submitted successfully!");
+                    System.out.println("Order submitted successfully!");
                 } else {
                     System.out.println("Your cart is empty. Nothing to submit.");
                 }
             }
 
         } catch (SQLException e) {
-            System.out.println("Error submitting quotation: " + e.getMessage());
+            System.out.println("Error submitting Order: " + e.getMessage());
         }
 
         System.out.print("Press Enter to continue...");
