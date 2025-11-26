@@ -14,6 +14,39 @@ import javax.imageio.ImageIO;
 
 
 public class CartManager {
+	
+	public static void returnExpiredStock(Connection conn) {
+	    try {
+	        // Update product_sizes in one go using a JOIN and aggregation
+	        String updateStockSql = """
+	            UPDATE product_sizes ps
+	            JOIN (
+	                SELECT qi.product_id, qi.size, SUM(qi.quantity) AS qty
+	                FROM quotations q
+	                JOIN quotation_items qi ON q.id = qi.quotation_id
+	                WHERE q.status = 'PENDING' AND DATE(q.created_at) < CURDATE()
+	                GROUP BY qi.product_id, qi.size
+	            ) expired ON ps.product_id = expired.product_id AND ps.size = expired.size
+	            SET ps.stock = ps.stock + expired.qty
+	        """;
+
+	        try (PreparedStatement ps = conn.prepareStatement(updateStockSql)) {
+	            int rows = ps.executeUpdate();
+	            System.out.println("\u001B[32mReturned stock for " + rows + " product-size entries.\u001B[0m");
+	        }
+
+	        // Mark quotations as expired in one query
+	        String updateQuotes = "UPDATE quotations SET status = 'EXPIRED' WHERE status = 'PENDING' AND DATE(created_at) < CURDATE()";
+	        try (PreparedStatement psUpdate = conn.prepareStatement(updateQuotes)) {
+	            int updated = psUpdate.executeUpdate();
+	            System.out.println("\u001B[32mMarked " + updated + " quotations as expired.\u001B[0m");
+	        }
+
+	    } catch (SQLException e) {
+	        System.out.println("\u001B[31mError returning expired stock: " + e.getMessage() + "\u001B[0m");
+	    }
+	}
+
 
     // ==========================================================
     // ADD TO CART (DB VERSION)
@@ -300,7 +333,7 @@ public class CartManager {
 	            }
 	        }
 
-	        System.out.println("─────────────────────────────────────────────────────────────");
+	        System.out.println("────────────────────────────────────────────────────────────────────");
 
 	        // Options
 	        System.out.println("\nOptions:");
@@ -478,8 +511,14 @@ public class CartManager {
 	                }
 	            }
 
-	            g.drawLine(padding, y, imageWidth - padding, y); y += lineHeight;
+	            g.drawLine(padding, y, imageWidth - padding, y); 
+	            y += lineHeight;
+
 	            g.drawString("GRAND TOTAL: " + String.format("%.2f", totalAmount), padding, y);
+	            y += lineHeight; // move down for caption
+
+	            g.setFont(new Font("Monospaced", Font.ITALIC, 12));
+	            g.drawString("This invoice is valid only on the date of issue.", padding, y);
 
 	            g.dispose();
 
